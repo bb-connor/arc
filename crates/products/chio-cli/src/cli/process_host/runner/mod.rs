@@ -17,8 +17,8 @@ use tokio::time::Instant;
 
 use super::state::{error, read_json, Host};
 use crate::CliError;
-use child::Usage;
-use journal::{Completion, Journal};
+use chio_process::run_journal::{Completion, ResourceUsage, WorkerState};
+use journal::Journal;
 use plan::{FailurePolicy, Plan};
 
 struct Attempt {
@@ -54,8 +54,10 @@ async fn next_event<T: 'static>(
     }
 }
 
-pub(super) fn cleanup_socket_for_export(db: &rusqlite::Connection) -> Result<(), CliError> {
-    socket::cleanup_for_export(db)
+pub(super) fn cleanup_socket_for_export(
+    store: &chio_store_sqlite::process_run_store::SqliteRunJournal,
+) -> Result<(), CliError> {
+    socket::cleanup_for_export(store)
 }
 
 /// Read completion from the bound journal while the caller owns the stopped host.
@@ -68,7 +70,9 @@ pub(super) fn completed_snapshot(host: &Host, path: &Path) -> Result<serde_json:
     let journal = Journal::open(host, &plan)?;
     let snapshots = journal.snapshots()?;
     if !journal.completion()?.complete
-        || snapshots.iter().any(|worker| worker.state != "completed")
+        || snapshots
+            .iter()
+            .any(|worker| worker.state != WorkerState::Completed)
         || !journal.containers()?.is_empty()
         || journal.abandoned_socket_intents()? != 0
     {
@@ -205,7 +209,7 @@ async fn drive(
                     chio_process::ProcessState::Cancelled => {
                         service.revoke_credentials(&worker.process).map_err(error)?;
                         cancelled.insert(worker.process.clone());
-                        if snapshots.iter().any(|s| s.process == worker.process && s.state == "pending") {
+                        if snapshots.iter().any(|s| s.process == worker.process && s.state == WorkerState::Pending) {
                             journal.cancel_pending(&worker)?;
                         }
                         if let Some(signal) = cancellation.get(&index) {
@@ -219,12 +223,12 @@ async fn drive(
             let stopping = plan.failure_policy == FailurePolicy::Stop && journal.has_stop_failure(&snapshots, &cancelled)?;
             let draining = !cancelled.is_empty();
             if draining && active.is_empty() { return Err(error("run worker was cancelled")); }
-            if snapshots.iter().any(|s| s.state == "failed") {
-                let finishing_failed = active_ids.iter().any(|index| snapshots.iter().any(|snapshot| snapshot.process == journal.workers[*index].process && snapshot.state == "failed"));
+            if snapshots.iter().any(|s| s.state == WorkerState::Failed) {
+                let finishing_failed = active_ids.iter().any(|index| snapshots.iter().any(|snapshot| snapshot.process == journal.workers[*index].process && snapshot.state == WorkerState::Failed));
                 if stopping && !finishing_failed {
                     return Err(error("worker restart budget exhausted; preserve state and inspect with chio process status and chio process logs"));
                 }
-                if snapshots.iter().all(|s| s.state == "completed" || s.state == "failed") && active.is_empty() {
+                if snapshots.iter().all(|s| s.state.is_terminal()) && active.is_empty() {
                     if plan.failure_policy == FailurePolicy::Supervised {
                         return if journal.completion()?.complete { Ok(()) } else {
                             Err(error("run contains unhandled child failures or failed declared workers; inspect status and logs"))
@@ -233,8 +237,8 @@ async fn drive(
                     return Err(error("independent work finished; run contains failed workers or failed dependencies; inspect with chio process status and chio process logs"));
                 }
             }
-            if snapshots.iter().all(|s| s.state == "completed") && active.is_empty() { return journal.check_publication(); }
-            let pending: BTreeSet<_> = snapshots.iter().filter(|s| s.state == "pending").map(|s| s.process.as_str()).collect();
+            if snapshots.iter().all(|s| s.state == WorkerState::Completed) && active.is_empty() { return journal.check_publication(); }
+            let pending: BTreeSet<_> = snapshots.iter().filter(|s| s.state == WorkerState::Pending).map(|s| s.process.as_str()).collect();
             let mut ready = ready_indices(active.len(), plan.max_parallel, journal.workers.len(), |index| {
                 let worker = &journal.workers[index];
                 if active_ids.contains(&index) || !pending.contains(worker.process.as_str())
@@ -392,7 +396,7 @@ async fn drive(
         }
     }
     for snapshot in journal.snapshots()? {
-        if snapshot.state != "running" {
+        if snapshot.state != WorkerState::Running {
             continue;
         }
         let worker = journal
@@ -410,7 +414,7 @@ async fn drive(
             } else {
                 Completion::Failed("runner_interrupted")
             },
-            Usage::default(),
+            ResourceUsage::default(),
         )?;
     }
     result
@@ -433,7 +437,7 @@ fn record_attempt(
                 journal.finish(
                     &worker,
                     Completion::Terminal("worker_launch_or_wait_uncertain"),
-                    Usage::default(),
+                    ResourceUsage::default(),
                 )?;
             }
             service.revoke_credentials(&worker.process).map_err(error)?;

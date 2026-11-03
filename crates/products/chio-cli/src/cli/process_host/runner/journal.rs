@@ -1,49 +1,20 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
-use std::time::Duration;
 
-use rusqlite::{params, Connection, TransactionBehavior};
+use chio_process::run_journal::{
+    Completion, ContainerIntent, ResourceUsage, WorkerSeed, WorkerState, WorkerTransition,
+};
+use chio_store_sqlite::process_run_store::{SqliteContainerJournal, SqliteRunJournal};
 use serde::Serialize;
 
 use super::super::diagnostics::{RunStatus, WorkerStatus, RUN_SCHEMA, STATUS_FILE};
 use super::super::state::{error, Host};
-use super::child::Usage;
-use super::container::Lease;
 use super::plan::{FailurePolicy, Plan, Worker};
 use crate::CliError;
 
-const JOURNAL_COLUMNS: [(&str, &[&str]); 5] = [
-    ("run_binding", &["singleton", "binding"]),
-    (
-        "run_workers",
-        &[
-            "process",
-            "state",
-            "attempts",
-            "suspensions",
-            "outcome",
-            "peak_resident_bytes",
-            "cpu_ms",
-        ],
-    ),
-    (
-        "run_containers",
-        &[
-            "owner",
-            "process",
-            "attempt",
-            "engine",
-            "container_id",
-            "create_rejected",
-        ],
-    ),
-    ("run_container_launches", &["process", "attempt", "record"]),
-    ("run_child_settlements", &["parent", "child", "request_id"]),
-];
-
 pub(super) struct Journal<'a> {
     clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
-    db: Connection,
+    store: SqliteRunJournal,
     directory: &'a chio_control_plane::PreparedPrivateDirectory,
     plan: &'a Plan,
     run_id: String,
@@ -57,32 +28,16 @@ pub(super) struct Journal<'a> {
 
 /// Each active container owns a connection so engine I/O cannot block the
 /// scheduler while preserving the durable create/start boundary.
-pub(super) struct ContainerWriter(Connection);
+pub(super) struct ContainerWriter(SqliteContainerJournal);
 
 impl ContainerWriter {
-    pub fn create_rejected(&mut self, lease: &mut Lease) -> Result<(), CliError> {
-        let changed = self.0.execute("UPDATE run_containers SET create_rejected=1 WHERE owner=?1 AND container_id IS NULL", [&lease.owner]).map_err(error)?;
-        if changed != 1 {
-            return Err(error(
-                "create rejection does not match a create-only intent",
-            ));
-        }
+    pub fn create_rejected(&mut self, lease: &mut ContainerIntent) -> Result<(), CliError> {
+        self.0.create_rejected(&lease.owner).map_err(error)?;
         lease.create_rejected = true;
         Ok(())
     }
-    pub fn created(&mut self, lease: &mut Lease, id: String) -> Result<(), CliError> {
-        let changed = self
-            .0
-            .execute(
-                "UPDATE run_containers SET container_id=?1 WHERE owner=?2 AND container_id IS NULL",
-                params![id, lease.owner],
-            )
-            .map_err(error)?;
-        if changed != 1 {
-            return Err(error(
-                "container creation does not match its durable intent",
-            ));
-        }
+    pub fn created(&mut self, lease: &mut ContainerIntent, id: String) -> Result<(), CliError> {
+        self.0.created(&lease.owner, &id).map_err(error)?;
         lease.id = Some(id);
         Ok(())
     }
@@ -92,31 +47,18 @@ impl ContainerWriter {
         &mut self,
         signed: &chio_process::SignedContainerLaunchRecord,
     ) -> Result<(), CliError> {
-        self.0
-            .execute(
-                "INSERT INTO run_container_launches(process,attempt,record) VALUES(?1,?2,?3)",
-                params![
-                    signed.record.process_id,
-                    signed.record.attempt,
-                    serde_json::to_string(signed).map_err(error)?
-                ],
-            )
-            .map_err(error)?;
-        Ok(())
+        self.0.launch_recorded(signed).map_err(error)
     }
 
-    pub fn removed(&mut self, lease: &Lease) -> Result<(), CliError> {
-        self.0
-            .execute("DELETE FROM run_containers WHERE owner=?1", [&lease.owner])
-            .map_err(error)?;
-        Ok(())
+    pub fn removed(&mut self, lease: &ContainerIntent) -> Result<(), CliError> {
+        self.0.removed(&lease.owner).map_err(error)
     }
 }
 
 #[derive(Serialize)]
 pub(super) struct Snapshot {
     pub process: String,
-    pub state: String,
+    pub state: WorkerState,
     pub attempts: u32,
     pub suspensions: u32,
     pub outcome: Option<String>,
@@ -126,35 +68,21 @@ pub(super) struct Snapshot {
     pub resource_accounting: Option<&'static str>,
 }
 
-/// How a launch ended, as the runner observed it.
-pub(super) enum Completion<'s> {
-    Completed(&'s str),
-    Suspended,
-    Failed(&'s str),
-    Terminal(&'s str),
-}
-
 impl<'a> Journal<'a> {
     pub fn socket_endpoint(&self) -> Result<super::socket::Endpoint, CliError> {
-        super::socket::Endpoint::prepare(&self.db)
+        super::socket::Endpoint::prepare(&self.store)
     }
 
     pub fn socket_bound(&self, endpoint: &super::socket::Endpoint) -> Result<(), CliError> {
-        endpoint.bound(&self.db)
+        endpoint.bound(&self.store)
     }
 
     pub fn socket_cleanup(&self, endpoint: &super::socket::Endpoint) -> Result<(), CliError> {
-        endpoint.cleanup(&self.db)
+        endpoint.cleanup(&self.store)
     }
 
-    pub fn abandoned_socket_intents(&self) -> Result<i64, CliError> {
-        self.db
-            .query_row(
-                "SELECT COUNT(*) FROM run_socket_leases WHERE singleton>1",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(error)
+    pub fn abandoned_socket_intents(&self) -> Result<u32, CliError> {
+        self.store.abandoned_socket_intents().map_err(error)
     }
 
     pub fn open(host: &'a Host, plan: &'a Plan) -> Result<Self, CliError> {
@@ -170,57 +98,13 @@ impl<'a> Journal<'a> {
         if !metadata.file_type().is_file() || metadata.permissions().mode() & 0o077 != 0 {
             return Err(error("runner journal must be a private regular file"));
         }
-        let mut db = Connection::open(&path).map_err(error)?;
-        db.busy_timeout(Duration::from_secs(5)).map_err(error)?;
-        db.pragma_update(None, "journal_mode", "WAL")
-            .map_err(error)?;
-        db.pragma_update(None, "synchronous", "FULL")
-            .map_err(error)?;
-        let tx = db
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(error)?;
-        tx.execute_batch("CREATE TABLE IF NOT EXISTS run_binding(singleton INTEGER PRIMARY KEY CHECK(singleton=1), binding TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS run_workers(process TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','running','completed','failed')), attempts INTEGER NOT NULL DEFAULT 0, suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts), outcome TEXT, peak_resident_bytes INTEGER NOT NULL DEFAULT 0, cpu_ms INTEGER NOT NULL DEFAULT 0);").map_err(error)?;
-        tx.execute_batch("CREATE TABLE IF NOT EXISTS run_containers(owner TEXT PRIMARY KEY, process TEXT NOT NULL, attempt INTEGER NOT NULL, engine TEXT NOT NULL, container_id TEXT, create_rejected INTEGER NOT NULL DEFAULT 0 CHECK(create_rejected IN (0,1)), UNIQUE(process,attempt));").map_err(error)?;
-        tx.execute_batch("CREATE TABLE IF NOT EXISTS run_container_launches(process TEXT NOT NULL, attempt INTEGER NOT NULL, record TEXT NOT NULL, PRIMARY KEY(process,attempt));").map_err(error)?;
-        tx.execute_batch("CREATE TABLE IF NOT EXISTS run_child_settlements(parent TEXT NOT NULL, child TEXT NOT NULL, request_id TEXT NOT NULL, PRIMARY KEY(parent,child));").map_err(error)?;
-        for (table, expected) in JOURNAL_COLUMNS {
-            let columns = tx
-                .prepare(&format!("PRAGMA table_info({table})"))
-                .map_err(error)?
-                .query_map([], |row| row.get::<_, String>(1))
-                .map_err(error)?
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(error)?;
-            if columns != expected {
-                return Err(error(format!(
-                    "runner journal table {table} does not have the v1 columns"
-                )));
-            }
-        }
         let binding = chio_core_types::crypto::canonical_json_bytes(&serde_json::json!({
             "version": 1, "authority": host.kernel.durable_admission_store_uuid(),
             "kernel_key": host.kernel.public_key().to_hex(), "plan": plan,
         }))
         .map_err(error)?;
         let binding = chio_core_types::crypto::sha256_hex(&binding);
-        tx.execute(
-            "INSERT OR IGNORE INTO run_binding VALUES(1, ?1)",
-            [&binding],
-        )
-        .map_err(error)?;
-        let stored: String = tx
-            .query_row(
-                "SELECT binding FROM run_binding WHERE singleton=1",
-                [],
-                |r| r.get(0),
-            )
-            .map_err(error)?;
-        if stored != binding {
-            return Err(error(
-                "run plan or authority changed; restore the original configuration",
-            ));
-        }
+        let mut store = SqliteRunJournal::open(&path, &binding).map_err(error)?;
         let mut workers = plan.workers.clone();
         let mut parents = BTreeMap::new();
         let registry = host.runtime.registry();
@@ -233,22 +117,17 @@ impl<'a> Journal<'a> {
             parents.insert(child.process.clone(), child.parent);
             workers.push(template.worker(child.process, child.input));
         }
-        if workers.len() > 128 {
-            return Err(error("run exceeds 128 total workers"));
-        }
-        for worker in &workers {
-            tx.execute(
-                "INSERT OR IGNORE INTO run_workers(process,state) VALUES(?1,'pending')",
-                [&worker.process],
-            )
-            .map_err(error)?;
-            tx.execute("UPDATE run_workers SET state=CASE WHEN attempts-suspensions>=?1 THEN 'failed' ELSE 'pending' END, outcome='host_interrupted' WHERE process=?2 AND state='running'",
-                params![worker.max_attempts, worker.process]).map_err(error)?;
-        }
-        tx.commit().map_err(error)?;
+        let seeds = workers
+            .iter()
+            .map(|worker| WorkerSeed {
+                process: &worker.process,
+                max_attempts: worker.max_attempts,
+            })
+            .collect::<Vec<_>>();
+        store.recover(&seeds).map_err(error)?;
         let journal = Self {
             clock: host.kernel.authority_clock(),
-            db,
+            store,
             directory,
             plan,
             run_id: uuid::Uuid::new_v4().to_string(),
@@ -274,7 +153,7 @@ impl<'a> Journal<'a> {
                     .ok_or_else(|| error("worker journal does not match its plan"))?;
                 Ok(WorkerStatus {
                     process: snapshot.process.clone(),
-                    state: snapshot.state.clone(),
+                    state: snapshot.state.as_str().to_owned(),
                     attempts: snapshot.attempts,
                     max_attempts: worker.max_attempts,
                     suspensions: snapshot.suspensions,
@@ -368,13 +247,13 @@ impl<'a> Journal<'a> {
             .filter(|id| {
                 !snapshots
                     .iter()
-                    .any(|s| s.process == *id && s.state == "completed")
+                    .any(|s| s.process == *id && s.state == WorkerState::Completed)
             })
             .collect();
         unresolved.extend(settled.into_iter().filter(|id| {
             !snapshots
                 .iter()
-                .any(|s| s.process == *id && matches!(s.state.as_str(), "completed" | "failed"))
+                .any(|s| s.process == *id && s.state.is_terminal())
         }));
         Ok(unresolved.into_iter().collect())
     }
@@ -383,21 +262,12 @@ impl<'a> Journal<'a> {
         let snapshots = self.snapshots()?;
         if self.plan.failure_policy != FailurePolicy::Supervised {
             return Ok(super::supervision::Completion {
-                complete: snapshots.iter().all(|s| s.state == "completed"),
+                complete: snapshots.iter().all(|s| s.state == WorkerState::Completed),
                 handled_failures: Vec::new(),
                 unhandled_failures: Vec::new(),
             });
         }
-        let settlements = self
-            .db
-            .prepare(
-                "SELECT parent,child,request_id FROM run_child_settlements ORDER BY parent,child",
-            )
-            .map_err(error)?
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
-            .map_err(error)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(error)?;
+        let settlements = self.store.settlements().map_err(error)?;
         super::supervision::evaluate(&snapshots, &self.plan.workers, &self.parents, &settlements)
     }
 
@@ -408,13 +278,13 @@ impl<'a> Journal<'a> {
     ) -> Result<bool, CliError> {
         let failed: BTreeSet<_> = snapshots
             .iter()
-            .filter(|s| s.state == "failed")
+            .filter(|s| s.state == WorkerState::Failed)
             .map(|s| s.process.as_str())
             .collect();
         let mut scoped: BTreeSet<_> = snapshots
             .iter()
             .filter(|s| {
-                s.state == "failed"
+                s.state == WorkerState::Failed
                     && s.outcome.as_deref() == Some("process_cancelled")
                     && cancelled.contains(&s.process)
             })
@@ -423,7 +293,7 @@ impl<'a> Journal<'a> {
         loop {
             let before = scoped.len();
             for snapshot in snapshots.iter().filter(|s| {
-                s.state == "failed" && s.outcome.as_deref() == Some("dependency_failed")
+                s.state == WorkerState::Failed && s.outcome.as_deref() == Some("dependency_failed")
             }) {
                 let worker = self
                     .workers
@@ -454,7 +324,7 @@ impl<'a> Journal<'a> {
         let snapshots = self.snapshots()?;
         let mut failed: BTreeSet<_> = snapshots
             .iter()
-            .filter(|s| s.state == "failed")
+            .filter(|s| s.state == WorkerState::Failed)
             .map(|s| s.process.clone())
             .collect();
         if failed.is_empty() {
@@ -464,7 +334,7 @@ impl<'a> Journal<'a> {
         for worker in &self.workers {
             if snapshots
                 .iter()
-                .any(|s| s.process == worker.process && s.state == "pending")
+                .any(|s| s.process == worker.process && s.state == WorkerState::Pending)
             {
                 pending.insert(worker.process.clone(), self.dependencies(worker)?);
             }
@@ -484,22 +354,8 @@ impl<'a> Journal<'a> {
             blocked.extend(next);
         }
         if !blocked.is_empty() {
-            let tx = self
-                .db
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(error)?;
-            for id in blocked {
-                let changed = tx.execute(
-                    "UPDATE run_workers SET state='failed',outcome='dependency_failed' WHERE process=?1 AND state='pending'",
-                    [&id],
-                ).map_err(error)?;
-                if changed != 1 {
-                    return Err(error(
-                        "failed dependency does not match pending worker state",
-                    ));
-                }
-            }
-            tx.commit().map_err(error)?;
+            let processes = blocked.iter().map(String::as_str).collect::<Vec<_>>();
+            self.store.fail_dependents(&processes).map_err(error)?;
             self.publish_observation();
         }
         Ok(())
@@ -515,9 +371,6 @@ impl<'a> Journal<'a> {
             {
                 continue;
             }
-            if self.workers.len() >= 128 {
-                return Err(error("run exceeds 128 total workers"));
-            }
             let template = self
                 .plan
                 .templates
@@ -525,12 +378,7 @@ impl<'a> Journal<'a> {
                 .find(|t| t.id == child.template)
                 .ok_or_else(|| error("child work has no pinned run template"))?;
             let worker = template.worker(child.process, child.input);
-            self.db
-                .execute(
-                    "INSERT INTO run_workers(process,state) VALUES(?1,'pending')",
-                    [&worker.process],
-                )
-                .map_err(error)?;
+            self.store.insert_worker(&worker.process).map_err(error)?;
             self.parents.insert(worker.process.clone(), child.parent);
             self.workers.push(worker);
             changed = true;
@@ -556,55 +404,50 @@ impl<'a> Journal<'a> {
     }
 
     pub fn snapshots(&self) -> Result<Vec<Snapshot>, CliError> {
-        self.db
-            .prepare("SELECT process,state,attempts,suspensions,outcome,peak_resident_bytes,cpu_ms FROM run_workers ORDER BY process")
+        Ok(self
+            .store
+            .snapshots()
             .map_err(error)?
-            .query_map([], |r| {
-                let process: String = r.get(0)?;
-                let container = self.workers.iter().any(|worker| worker.container.is_some() && worker.process == process);
-                Ok(Snapshot {
-                    process,
-                    state: r.get(1)?,
-                    attempts: r.get(2)?,
-                    suspensions: r.get(3)?,
-                    outcome: r.get(4)?,
-                    peak_resident_bytes: accounted(r.get(5)?, 5)?,
-                    cpu_ms: accounted(r.get(6)?, 6)?,
+            .into_iter()
+            .map(|record| {
+                let container = self
+                    .workers
+                    .iter()
+                    .any(|worker| worker.container.is_some() && worker.process == record.process);
+                Snapshot {
+                    process: record.process,
+                    state: record.state,
+                    attempts: record.attempts,
+                    suspensions: record.suspensions,
+                    outcome: record.outcome,
+                    peak_resident_bytes: record.peak_resident_bytes,
+                    cpu_ms: record.cpu_ms,
                     resource_accounting: container.then_some("unavailable_container_cgroup"),
-                })
+                }
             })
-            .map_err(error)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(error)
+            .collect())
     }
 
     /// Reserve the next launch. Launches that ended in a recorded cooperative
     /// suspension do not count against the failure ceiling.
     pub fn start(&mut self, worker: &Worker) -> Result<u32, CliError> {
-        let changed = self.db.execute("UPDATE run_workers SET state='running',attempts=attempts+1,outcome=NULL WHERE process=?1 AND state='pending' AND attempts-suspensions<?2", params![worker.process,worker.max_attempts]).map_err(error)?;
-        if changed != 1 {
-            return Err(error("worker attempt cannot be admitted"));
-        }
-        let attempt = self
-            .db
-            .query_row(
-                "SELECT attempts FROM run_workers WHERE process=?1",
-                [&worker.process],
-                |r| r.get(0),
+        let record = self
+            .store
+            .transition(
+                &worker.process,
+                WorkerTransition::Start {
+                    max_attempts: worker.max_attempts,
+                },
             )
             .map_err(error)?;
         self.publish_observation();
-        Ok(attempt)
+        Ok(record.attempts)
     }
 
     pub fn cancel_pending(&mut self, worker: &Worker) -> Result<(), CliError> {
-        let changed = self.db.execute(
-            "UPDATE run_workers SET state='failed',outcome='process_cancelled' WHERE process=?1 AND state='pending'",
-            [&worker.process],
-        ).map_err(error)?;
-        if changed != 1 {
-            return Err(error("cancellation does not match pending worker state"));
-        }
+        self.store
+            .transition(&worker.process, WorkerTransition::CancelPending)
+            .map_err(error)?;
         self.publish_observation();
         Ok(())
     }
@@ -616,61 +459,42 @@ impl<'a> Journal<'a> {
         process: &str,
         attempt: u32,
         engine: String,
-    ) -> Result<Lease, CliError> {
-        let lease = Lease {
+    ) -> Result<ContainerIntent, CliError> {
+        let lease = ContainerIntent {
             owner: uuid::Uuid::new_v4().simple().to_string(),
             engine,
             id: None,
             create_rejected: false,
         };
-        let changed = self.db.execute("INSERT INTO run_containers(owner,process,attempt,engine) SELECT ?1,process,attempts,?2 FROM run_workers WHERE process=?3 AND attempts=?4 AND state='running'", params![lease.owner, lease.engine, process, attempt]).map_err(error)?;
-        if changed != 1 {
-            return Err(error("container has no reserved worker attempt"));
-        }
+        self.store
+            .reserve_container(process, attempt, &lease.owner, &lease.engine)
+            .map_err(error)?;
         Ok(lease)
     }
 
     /// Only Command::spawn's definite pre-exec refusal authorizes this rollback.
     pub fn unreserve(&self, worker: &Worker) -> Result<(), CliError> {
-        let changed = self.db.execute("UPDATE run_workers SET state='pending',attempts=attempts-1,outcome='worker_not_executed' WHERE process=?1 AND state='running' AND attempts>suspensions AND NOT EXISTS(SELECT 1 FROM run_containers WHERE process=?1)", [&worker.process]).map_err(error)?;
-        if changed != 1 {
-            return Err(error("unexecuted launch does not match its reservation"));
-        }
+        self.store
+            .transition(&worker.process, WorkerTransition::Unreserve)
+            .map_err(error)?;
         self.publish_observation();
         Ok(())
     }
 
     pub fn container_writer(&self) -> Result<ContainerWriter, CliError> {
         self.directory.validate_path_identity()?;
-        let db = Connection::open(self.directory.path().join("runner.db")).map_err(error)?;
-        db.busy_timeout(Duration::from_secs(5)).map_err(error)?;
-        db.pragma_update(None, "synchronous", "FULL")
-            .map_err(error)?;
-        Ok(ContainerWriter(db))
+        Ok(ContainerWriter(
+            SqliteContainerJournal::open(&self.directory.path().join("runner.db"))
+                .map_err(error)?,
+        ))
     }
 
-    pub fn containers(&self) -> Result<Vec<Lease>, CliError> {
-        self.db
-            .prepare("SELECT owner,engine,container_id,create_rejected FROM run_containers ORDER BY owner")
-            .map_err(error)?
-            .query_map([], |row| {
-                Ok(Lease {
-                    owner: row.get(0)?,
-                    engine: row.get(1)?,
-                    id: row.get(2)?,
-                    create_rejected: row.get(3)?,
-                })
-            })
-            .map_err(error)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(error)
+    pub fn containers(&self) -> Result<Vec<ContainerIntent>, CliError> {
+        self.store.containers().map_err(error)
     }
 
-    pub fn container_removed(&self, lease: &Lease) -> Result<(), CliError> {
-        self.db
-            .execute("DELETE FROM run_containers WHERE owner=?1", [&lease.owner])
-            .map_err(error)?;
-        Ok(())
+    pub fn container_removed(&self, lease: &ContainerIntent) -> Result<(), CliError> {
+        self.store.container_removed(&lease.owner).map_err(error)
     }
 
     /// Record how the active launch ended and what it used. A recorded
@@ -681,55 +505,22 @@ impl<'a> Journal<'a> {
         &mut self,
         worker: &Worker,
         end: Completion<'_>,
-        usage: Usage,
+        usage: ResourceUsage,
     ) -> Result<(), CliError> {
-        let (success, suspended, terminal, outcome) = match end {
-            Completion::Completed(outcome) => (true, false, false, outcome),
-            Completion::Suspended => (false, true, false, "suspended"),
-            Completion::Failed(outcome) => (false, false, false, outcome),
-            Completion::Terminal(outcome) => (false, false, true, outcome),
-        };
-        let changed = self
-            .db
-            .execute(
-                "UPDATE run_workers SET suspensions=suspensions+?2,
-                state=CASE WHEN ?1 THEN 'completed'
-                    WHEN ?3 THEN 'failed'
-                    WHEN ?2 THEN CASE WHEN suspensions+1>?5 THEN 'failed' ELSE 'pending' END
-                    WHEN attempts-suspensions>=?4 THEN 'failed' ELSE 'pending' END,
-                outcome=?6,
-                peak_resident_bytes=MAX(peak_resident_bytes,?8),
-                cpu_ms=cpu_ms+?9
-             WHERE process=?7 AND state='running'",
-                params![
-                    success,
-                    suspended,
-                    terminal,
-                    worker.max_attempts,
-                    worker.max_suspensions(),
-                    outcome,
-                    worker.process,
-                    stored(usage.peak_resident_bytes),
-                    stored(usage.cpu_ms),
-                ],
+        self.store
+            .transition(
+                &worker.process,
+                WorkerTransition::Finish {
+                    completion: end,
+                    max_attempts: worker.max_attempts,
+                    max_suspensions: worker.max_suspensions(),
+                    usage,
+                },
             )
             .map_err(error)?;
-        if changed != 1 {
-            return Err(error("worker completion does not match its active attempt"));
-        }
         self.publish_observation();
         Ok(())
     }
-}
-
-/// Accounted values are stored as SQLite integers; a value the column cannot
-/// hold saturates rather than failing the attempt.
-fn stored(value: u64) -> i64 {
-    i64::try_from(value).unwrap_or(i64::MAX)
-}
-
-fn accounted(value: i64, column: usize) -> rusqlite::Result<u64> {
-    u64::try_from(value).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(column, value))
 }
 
 #[cfg(test)]

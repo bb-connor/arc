@@ -33,6 +33,7 @@ chio-manifest = { workspace = true, optional = true }
 
 [dev-dependencies]
 chio-test-support = { workspace = true }
+proptest = { workspace = true }
 async-trait = { workspace = true }
 chio-store-sqlite = { workspace = true }
 tempfile = { workspace = true }

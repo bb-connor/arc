@@ -33,6 +33,8 @@ pub enum ProcessError {
     #[error(transparent)]
     Sqlite(#[from] rusqlite::Error),
     #[error(transparent)]
+    Journal(#[from] crate::run_journal::JournalError),
+    #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
     Core(#[from] chio_core_types::Error),
