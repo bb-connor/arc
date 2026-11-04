@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use chio_secure_ipc::regular_file::RegularFileError;
+
 use crate::passport_verifier::RegistryUpdateError;
 use crate::CliError;
 
@@ -35,10 +37,6 @@ pub(crate) mod revocation_capacity;
 #[path = "registry/older_registry_files.rs"]
 mod older_registry_files;
 
-#[cfg(test)]
-#[path = "registry/registry_writer_lock.rs"]
-mod registry_writer_lock;
-
 impl Default for CertificationRegistry {
     fn default() -> Self {
         Self {
@@ -67,8 +65,8 @@ impl CertificationRegistry {
                 }
                 Ok(registry)
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(CliError::Io(error)),
+            Err(RegularFileError::Missing) => Ok(Self::default()),
+            Err(error) => Err(error.into()),
         }
     }
 
@@ -92,7 +90,7 @@ impl CertificationRegistry {
     /// first; test fixtures only.
     #[cfg(test)]
     pub(crate) fn save(&self, path: &Path) -> Result<(), CliError> {
-        let lock = crate::signed_input::lock_registry(path).map_err(CliError::from)?;
+        let lock = chio_secure_ipc::registry_file::RegistryFile::lock(path)?;
         crate::signed_input::write_reserving_registry(&lock, self)
     }
 

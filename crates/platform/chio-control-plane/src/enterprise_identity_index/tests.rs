@@ -608,9 +608,11 @@ fn a_fifo_at_the_index_path_is_refused_without_blocking() {
     assert!(
         matches!(
             &outcome,
-            Err(EnterpriseIdentityIndexError::Registry(RegistryUpdateError::Load(
-                crate::CliError::Io(error)
-            ))) if error.kind() == std::io::ErrorKind::InvalidInput
+            Err(EnterpriseIdentityIndexError::Registry(
+                RegistryUpdateError::Load(crate::CliError::File(
+                    chio_secure_ipc::regular_file::RegularFileError::NotRegular
+                ))
+            ))
         ),
         "{outcome:?}"
     );

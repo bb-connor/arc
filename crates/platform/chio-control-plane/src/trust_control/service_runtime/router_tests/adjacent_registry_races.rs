@@ -100,8 +100,8 @@ impl PausedRedemption {
 
 fn assert_registry_busy(path: &Path) {
     assert!(matches!(
-        crate::signed_input::lock_registry(path),
-        Err(RegistryUpdateError::Busy)
+        chio_secure_ipc::registry_file::RegistryFile::lock(path),
+        Err(chio_secure_ipc::registry_file::RegistryFileError::Busy)
     ));
 }
 
@@ -664,7 +664,9 @@ async fn cancelled_token_redemption_keeps_its_permit_and_still_consumes_the_code
     release.send(())?;
     tokio::time::timeout(HANG_GUARD, lane.wait_for_free_permit()).await?;
     assert_eq!(lane.available_permits(), 1);
-    drop(crate::signed_input::lock_registry(&offers.path).map_err(CliError::from)?);
+    drop(chio_secure_ipc::registry_file::RegistryFile::lock(
+        &offers.path,
+    )?);
     let reopened = persisted_offers(&offers.path)?;
     let consumed = reopened
         .offers
@@ -732,7 +734,9 @@ async fn cancelled_credential_redemption_keeps_its_permit_and_still_consumes_the
     release.send(())?;
     tokio::time::timeout(HANG_GUARD, lane.wait_for_free_permit()).await?;
     assert_eq!(lane.available_permits(), 1);
-    drop(crate::signed_input::lock_registry(&offers.path).map_err(CliError::from)?);
+    drop(chio_secure_ipc::registry_file::RegistryFile::lock(
+        &offers.path,
+    )?);
     assert!(!persisted_offers(&offers.path)?
         .offers
         .contains_key(&record.offer_id));

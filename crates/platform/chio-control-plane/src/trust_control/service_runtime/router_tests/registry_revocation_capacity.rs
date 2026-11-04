@@ -221,7 +221,7 @@ async fn a_revocation_while_another_writer_holds_the_registry_is_busy_and_change
     for (state, path, resource, revoked_at) in cases {
         let revoke = format!("{resource}/revoke");
         let request = json!({ "reason": "compromised", "revokedAt": revoked_at });
-        let held = crate::signed_input::lock_registry(&path).map_err(CliError::from)?;
+        let held = chio_secure_ipc::registry_file::RegistryFile::lock(&path)?;
         let before = std::fs::read(&path)?;
         let (status, body) = call(&state, "POST", &revoke, Some(request.clone())).await?;
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{body}");
