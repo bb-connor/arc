@@ -14,7 +14,9 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::Response;
 use chio_core::crypto::{Keypair, PublicKey, SigningAlgorithm};
 use chio_core::{verify_wrapped_bytes, CanonicalBytes, CanonicalJsonWitness, Signature};
-use chio_store_sqlite::{ClusterPeerReplayStoreError, SqliteClusterPeerReplayStore};
+use chio_security_types::ports::{
+    ClusterPeerNodeId, PeerIssuedAtSecs, PeerReplayHighWaterStore, PeerReplayStoreError,
+};
 use serde::Deserialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -1197,7 +1199,7 @@ fn is_lowercase_hex_32(value: &str) -> bool {
 #[derive(Debug)]
 pub struct PeerNonceCache {
     state: Mutex<NonceState>,
-    store: Arc<SqliteClusterPeerReplayStore>,
+    store: Arc<dyn PeerReplayHighWaterStore>,
     capacity: usize,
     per_peer_capacity: usize,
 }
@@ -1254,10 +1256,10 @@ impl PeerNonceCache {
     /// cache starts at; when the receiver clock cannot be read at
     /// construction, the first observed time becomes the start.
     pub fn open(
-        store: Arc<SqliteClusterPeerReplayStore>,
+        store: Arc<dyn PeerReplayHighWaterStore>,
         start_secs: Option<i64>,
         pinned_peers: usize,
-    ) -> Result<Self, ClusterPeerReplayStoreError> {
+    ) -> Result<Self, PeerReplayStoreError> {
         Self::with_capacity(
             store,
             start_secs,
@@ -1268,12 +1270,16 @@ impl PeerNonceCache {
 
     /// As [`PeerNonceCache::open`], holding at most `capacity` entries.
     pub fn with_capacity(
-        store: Arc<SqliteClusterPeerReplayStore>,
+        store: Arc<dyn PeerReplayHighWaterStore>,
         start_secs: Option<i64>,
         pinned_peers: usize,
         capacity: usize,
-    ) -> Result<Self, ClusterPeerReplayStoreError> {
-        let floors: HashMap<String, i64> = store.high_waters()?.into_iter().collect();
+    ) -> Result<Self, PeerReplayStoreError> {
+        let floors: HashMap<String, i64> = store
+            .high_waters()?
+            .into_iter()
+            .map(|(node_id, issued_at)| (node_id.as_str().to_owned(), issued_at.get()))
+            .collect();
         Ok(Self {
             state: Mutex::new(NonceState {
                 start: start_secs,
@@ -1337,9 +1343,10 @@ impl PeerNonceCache {
             .get(node_id)
             .is_none_or(|stored| issued_at > *stored)
         {
-            self.store
-                .advance(node_id, issued_at)
-                .map_err(|_| PeerAuthError::PeerReplayStoreUnavailable)?;
+            ClusterPeerNodeId::new(node_id)
+                .zip(PeerIssuedAtSecs::new(issued_at))
+                .and_then(|(node, mark)| self.store.advance(&node, mark).ok())
+                .ok_or(PeerAuthError::PeerReplayStoreUnavailable)?;
             state.stored.insert(key.0.clone(), issued_at);
         }
         *state.per_peer.entry(key.0.clone()).or_insert(0) += 1;

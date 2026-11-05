@@ -225,6 +225,14 @@ pub use outbox::{
     PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION,
 };
 
+mod peer_replay;
+#[cfg(feature = "std")]
+pub use peer_replay::PeerReplayHighWaterStore;
+pub use peer_replay::{
+    ClusterPeerNodeId, PeerIssuedAtSecs, PeerReplayStoreError, CLUSTER_PEER_NODE_ID_MAX_BYTES,
+    CLUSTER_PEER_REPLAY_MAX_PEERS,
+};
+
 mod receipts;
 pub use receipts::{ExactReceiptRecord, ReceiptAppendRequest};
 #[cfg(feature = "std")]
