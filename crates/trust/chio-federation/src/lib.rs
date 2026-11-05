@@ -20,6 +20,7 @@ pub mod bilateral_verifier;
 pub mod demo;
 pub mod error;
 pub mod frost;
+pub mod issuance_requests;
 pub mod metrics;
 pub mod open_admission;
 pub mod pheromone_gossip;
