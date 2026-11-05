@@ -9,6 +9,7 @@
 
 pub use chio_core_types::{capability, receipt};
 pub use chio_market as market;
+#[cfg(feature = "web3")]
 pub use chio_web3 as web3;
 
 mod error;

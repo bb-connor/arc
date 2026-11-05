@@ -11,10 +11,14 @@ publish = false
 [lib]
 name = "chio_autonomy"
 
+[features]
+default = []
+web3 = ["dep:chio-web3"]
+
 [dependencies]
 chio-core-types = { workspace = true }
 chio-market = { workspace = true }
-chio-web3 = { workspace = true }
+chio-web3 = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

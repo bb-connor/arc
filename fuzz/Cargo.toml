@@ -47,7 +47,7 @@ chio-anchor = { path = "../crates/economy/chio-anchor", features = ["fuzz"] }
 chio-attest-verify = { path = "../crates/trust/chio-attest-verify" }
 chio-commerce-order = { path = "../crates/platform/chio-commerce-order", features = ["fuzz"] }
 chio-config = { path = "../crates/platform/chio-config", features = ["fuzz"] }
-chio-core = { path = "../crates/core/chio-core" }
+chio-core = { path = "../crates/core/chio-core", features = ["web3"] }
 # No `fuzz` feature on chio-core-types or chio-manifest; both are pure-serde
 # Deserialize surfaces, so the fuzz harness drives `serde_json::from_slice`
 # directly.

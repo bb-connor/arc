@@ -6,7 +6,8 @@ The public surface contains ten artifact/report families and their
 `validate_*` functions, supporting enums and structs, schema constants,
 `AutonomyContractError`, and signed-envelope aliases for nine families.
 `AutonomousQualificationMatrix` is an unsigned model with a validator.
-The crate re-exports `capability`, `receipt`, `market`, and `web3` for field types.
+The crate re-exports `capability`, `receipt`, and `market` for field types, and
+`web3` when the `web3` feature is enabled.
 
 The library owns artifact shape and local consistency rules. Applications own
 pricing models, evidence resolution, signature verification, live authority
@@ -90,10 +91,14 @@ observed outcomes to agree. Preserve these distinctions in operator reports.
 
 `chio-core-types` supplies `MonetaryAmount`, runtime assurance tiers, and
 `SignedExportEnvelope`. `chio-market` supplies `LiabilityCoverageClass`;
-`chio-web3` supplies `Web3SettlementLifecycleState`. Serde implements artifact
+`chio-web3`, optional behind the `web3` feature, supplies
+`Web3SettlementLifecycleState`. Serde implements artifact
 serialization and deserialization; `thiserror` formats the closed error enum.
-`serde_json` supports reference-fixture parsing in tests. The manifest declares
-no feature flags, optional dependencies, or benchmark targets.
+`serde_json` supports reference-fixture parsing in tests. The `web3` feature
+(off by default) enables `chio-web3`, the `web3` re-export, the
+`latest_web3_settlement_state` pricing-input field and its evidence check;
+without it, a pricing input carrying that field fails deserialization.
+The manifest declares no benchmark targets.
 
 ## Verification
 

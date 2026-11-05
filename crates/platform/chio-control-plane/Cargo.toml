@@ -33,7 +33,7 @@ chio-revocation-oracle = { workspace = true, features = ["sqlite"] }
 chio-spec-validate = { workspace = true }
 chio-appraisal = { workspace = true }
 chio-commerce-order = { workspace = true }
-chio-core = { workspace = true }
+chio-core = { workspace = true, features = ["web3"] }
 chio-core-types = { workspace = true }
 chio-credentials = { workspace = true }
 chio-data-guards = { workspace = true }

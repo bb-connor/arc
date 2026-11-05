@@ -25,7 +25,7 @@ web3 = [
 ]
 
 [dependencies]
-chio-core = { workspace = true }
+chio-core = { workspace = true, features = ["web3"] }
 chio-egress-contract = { workspace = true, features = ["reqwest-egress"] }
 alloy-contract = { version = "1.8.3", default-features = false, optional = true }
 alloy-json-rpc = { version = "1.8.3", default-features = false, optional = true }

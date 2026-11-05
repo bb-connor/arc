@@ -18,6 +18,7 @@ web3 = [
     "dep:alloy-sol-types",
     "dep:async-trait",
     "dep:chio-core",
+    "chio-core/web3",
     "dep:chio-security-types",
     "dep:chio-egress-contract",
     "dep:chio-kernel",

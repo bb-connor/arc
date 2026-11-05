@@ -43,6 +43,7 @@ pub use chio_market as market;
 pub use chio_open_market as open_market;
 pub mod standards;
 pub use chio_underwriting as underwriting;
+#[cfg(feature = "web3")]
 pub use chio_web3 as web3;
 
 pub use appraisal::{
@@ -344,6 +345,7 @@ pub use underwriting::{
     UNDERWRITING_POLICY_INPUT_SCHEMA, UNDERWRITING_RISK_TAXONOMY_VERSION,
     UNDERWRITING_SIMULATION_REPORT_SCHEMA,
 };
+#[cfg(feature = "web3")]
 pub use web3::anchors::{
     validate_anchor_inclusion_proof, validate_oracle_conversion_evidence,
     verify_anchor_inclusion_proof, verify_checkpoint_statement, AnchorInclusionProof,
@@ -353,23 +355,29 @@ pub use web3::anchors::{
     CHIO_CHECKPOINT_STATEMENT_SCHEMA, CHIO_LINK_ORACLE_AUTHORITY,
     CHIO_ORACLE_CONVERSION_EVIDENCE_SCHEMA,
 };
+#[cfg(feature = "web3")]
 pub use web3::chain::{
     validate_web3_chain_configuration, Web3ChainConfiguration, Web3ChainDeployment,
     Web3ChainGasProfile, Web3ChainRole, CHIO_WEB3_CHAIN_CONFIGURATION_SCHEMA,
 };
+#[cfg(feature = "web3")]
 pub use web3::contracts::{
     validate_web3_contract_package, Web3BindingLanguage, Web3BindingTarget, Web3ContractInterface,
     Web3ContractKind, Web3ContractPackage, CHIO_WEB3_CONTRACT_PACKAGE_SCHEMA,
 };
+#[cfg(feature = "web3")]
 pub use web3::error::Web3ContractError;
+#[cfg(feature = "web3")]
 pub use web3::identity::{
     validate_web3_identity_binding, verify_web3_identity_binding, SignedWeb3IdentityBinding,
     Web3IdentityBindingCertificate, Web3KeyBindingPurpose, CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
 };
+#[cfg(feature = "web3")]
 pub use web3::qualification::{
     validate_web3_qualification_matrix, Web3QualificationCase, Web3QualificationMatrix,
     Web3QualificationOutcome, CHIO_WEB3_QUALIFICATION_MATRIX_SCHEMA,
 };
+#[cfg(feature = "web3")]
 pub use web3::settlement::{
     validate_web3_settlement_dispatch, validate_web3_settlement_execution_receipt,
     SignedWeb3SettlementDispatch, SignedWeb3SettlementExecutionReceipt,
@@ -379,6 +387,7 @@ pub use web3::settlement::{
     CHIO_SETTLE_CONTROL_TRACE_SCHEMA, CHIO_WEB3_SETTLEMENT_DISPATCH_SCHEMA,
     CHIO_WEB3_SETTLEMENT_RECEIPT_SCHEMA,
 };
+#[cfg(feature = "web3")]
 pub use web3::trust_profile::{
     validate_web3_trust_profile, Web3ChainFinalityRule, Web3DisputePolicy, Web3DisputeWindow,
     Web3FinalityMode, Web3RegulatedRole, Web3RegulatedRoleAssumption, Web3SettlementPath,

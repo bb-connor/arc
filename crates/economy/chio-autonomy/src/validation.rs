@@ -81,6 +81,7 @@ pub fn validate_autonomous_pricing_input(
                 .to_string(),
         ));
     }
+    #[cfg(feature = "web3")]
     if input.latest_web3_settlement_state.is_some()
         && !kinds.contains(&AutonomousEvidenceKind::Web3SettlementReceipt)
     {

@@ -3,7 +3,8 @@
 `chio-autonomy` defines and validates artifacts for autonomous pricing,
 capital-pool optimization, execution records, comparison, drift, and rollback.
 It combines monetary and receipt types from `chio-core-types`, coverage classes
-from `chio-market`, and settlement lifecycle states from `chio-web3`.
+from `chio-market`, and, with the `web3` feature, settlement lifecycle states
+from `chio-web3`.
 
 The crate contains data models and synchronous validators. Applications own
 model execution, evidence retrieval, signing, persistence, and effect dispatch.

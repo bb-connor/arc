@@ -51,7 +51,7 @@ delegation = ["chio-core-types/delegation"]
 # The real Session retains its trusted native clock and terminal-admission
 # state machine under loom; runtime-bearing dependencies remain gated below.
 [dependencies]
-chio-core = { workspace = true }
+chio-core = { workspace = true, features = ["web3"] }
 chio-security-types = { workspace = true, features = ["std"] }
 serde = { workspace = true }
 thiserror = { workspace = true }

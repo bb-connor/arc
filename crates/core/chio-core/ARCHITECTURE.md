@@ -5,7 +5,8 @@
 The crate owns a unified Rust import surface and three local contract modules.
 `src/lib.rs` re-exports portable primitives from `chio-core-types` and domain
 APIs from appraisal, autonomy, credit, federation, governance, listing, market,
-open-market, underwriting, and web3 crates.
+open-market, and underwriting crates, and from `chio-web3` when the `web3`
+feature is enabled (it also enables `chio-autonomy/web3`).
 Re-exporting preserves each dependency's implementation and error semantics.
 The facade does not implement tool execution, receipt persistence, or runtime
 admission for those domains.
