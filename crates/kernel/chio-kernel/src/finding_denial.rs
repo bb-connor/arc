@@ -1,8 +1,7 @@
 //! Typed denial vocabulary for the injected finding verifier seams.
 //!
-//! Every verifier behind [`crate::finding_purchase::FindingPurchaseVerifier`],
-//! [`crate::finding_purchase::FindingStatusProofVerifier`], and
-//! [`crate::finding_recovery::FindingRecoveryVerifier`] denies with a
+//! Every verifier behind `FindingPurchaseVerifier`,
+//! `FindingStatusProofVerifier`, and `FindingRecoveryVerifier` denies with a
 //! [`FindingDenial`]: a closed machine-readable family plus operator prose.
 //! The code is the stable matching surface for telemetry and evidence
 //! consumers; the prose is free to evolve and is never matched on.

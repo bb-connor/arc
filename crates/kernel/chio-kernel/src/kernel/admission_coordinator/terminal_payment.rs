@@ -199,18 +199,7 @@ impl ChioKernel {
         }
         if settle_action == crate::payment::PaymentSettleAction::Capture {
             if let Some(purchase) = purchase {
-                let verifier = self.finding_purchase_verifier.as_ref().ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "purchase capture lost its configured verifier".to_owned(),
-                    )
-                })?;
-                verifier
-                    .mark_capture_pending(purchase, trusted_now_unix_ms / 1_000)
-                    .map_err(|error| {
-                        KernelError::DurableAdmission(format!(
-                            "purchase capture fence failed: {error}"
-                        ))
-                    })?;
+                self.mark_finding_purchase_capture_pending(purchase, trusted_now_unix_ms / 1_000)?;
             }
         }
         journal = self

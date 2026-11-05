@@ -118,6 +118,7 @@ pub(crate) struct DeliveryEvaluation {
     pub(crate) digest_mismatched: bool,
     /// The reveal-envelope check, run only for a purchase-marked delivery
     /// whose digest matched.
+    #[cfg_attr(not(feature = "finding-market"), allow(dead_code))]
     pub(crate) reveal_check: Option<RevealEnvelopeCheck>,
     /// The denial that terminates this delivery, if any.
     pub(crate) denial: Option<DeliveryDenial>,
@@ -171,7 +172,7 @@ pub(crate) fn evaluate_delivery(
             denial: None,
         };
     };
-    let reveal_check = check_reveal_envelope(canonical_content, &binding.payload_media_type);
+    let reveal_check = check_reveal_envelope(canonical_content, purchase_media_type(binding));
     let denial = match reveal_check {
         RevealEnvelopeCheck::Matched => None,
         RevealEnvelopeCheck::EnvelopeMalformed => Some(DeliveryDenial {
@@ -192,7 +193,26 @@ pub(crate) fn evaluate_delivery(
     }
 }
 
+#[cfg(feature = "finding-market")]
+fn purchase_media_type(binding: &crate::finding_purchase::VerifiedFindingPurchase) -> &str {
+    &binding.payload_media_type
+}
+
+#[cfg(not(feature = "finding-market"))]
+fn purchase_media_type(binding: &crate::finding_purchase::VerifiedFindingPurchase) -> &str {
+    match *binding {}
+}
+
+#[cfg(not(feature = "finding-market"))]
+pub(crate) fn finding_delivery_block(
+    binding: &crate::finding_purchase::VerifiedFindingPurchase,
+    _evaluation: &DeliveryEvaluation,
+) -> chio_core::receipt::metadata::FindingDelivery {
+    match *binding {}
+}
+
 /// Build the finding-delivery overlay block from kernel-verified facts.
+#[cfg(feature = "finding-market")]
 pub(crate) fn finding_delivery_block(
     binding: &crate::finding_purchase::VerifiedFindingPurchase,
     evaluation: &DeliveryEvaluation,
@@ -277,7 +297,15 @@ pub(crate) fn attach_finding_recovery_metadata(
     )
 }
 
+#[cfg(not(feature = "finding-market"))]
+pub(crate) fn finding_recovery_block(
+    binding: &crate::finding_recovery::VerifiedFindingRecovery,
+) -> chio_core::receipt::metadata::FindingRecovery {
+    match *binding {}
+}
+
 /// Build the finding-recovery overlay block from kernel-verified facts.
+#[cfg(feature = "finding-market")]
 pub(crate) fn finding_recovery_block(
     binding: &crate::finding_recovery::VerifiedFindingRecovery,
 ) -> chio_core::receipt::metadata::FindingRecovery {

@@ -164,6 +164,33 @@ impl ChioKernel {
         Ok(())
     }
 
+    pub(crate) fn record_finding_recovery_receipt(
+        &self,
+        recovery: &VerifiedFindingRecovery,
+        _receipt_id: &str,
+        _recorded_at: u64,
+        _phase: &str,
+    ) -> Result<(), KernelError> {
+        match *recovery {}
+    }
+
+    pub(crate) fn mark_finding_purchase_capture_pending(
+        &self,
+        purchase: &VerifiedFindingPurchase,
+        _now_unix_secs: u64,
+    ) -> Result<(), KernelError> {
+        match *purchase {}
+    }
+
+    pub(crate) fn verify_finding_memory_current_status(
+        &self,
+        _finding_id: &str,
+        _status_proof: &chio_core::receipt::metadata::FindingStatusProofMetadata,
+        _now_unix_secs: u64,
+    ) -> Result<(), KernelError> {
+        Err(KernelError::GuardDenied(MARKET_DISABLED.to_owned()))
+    }
+
     /// Startup reconciliation has nothing to reconcile without a pool
     /// ledger.
     pub(crate) fn reconcile_finding_pool_terminal_claims(&self) -> Result<usize, KernelError> {

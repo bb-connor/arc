@@ -96,11 +96,26 @@ pub mod finding_pool {
     pub use crate::finding_pool_error::FindingPoolLedgerError;
 }
 #[cfg(not(loom))]
+mod finding_admission_vocabulary;
+#[cfg(not(loom))]
 mod finding_pool_error;
-#[cfg(not(loom))]
+#[cfg(all(not(loom), feature = "finding-market"))]
 pub mod finding_purchase;
-#[cfg(not(loom))]
+#[cfg(all(not(loom), not(feature = "finding-market")))]
+pub(crate) mod finding_purchase {
+    pub(crate) use crate::finding_admission_vocabulary::{
+        VerifiedFindingPurchase, VerifiedFindingStatusProof,
+        FINDING_PURCHASE_REPLAY_SNAPSHOT_METADATA_KEY,
+    };
+}
+#[cfg(all(not(loom), feature = "finding-market"))]
 pub mod finding_recovery;
+#[cfg(all(not(loom), not(feature = "finding-market")))]
+pub(crate) mod finding_recovery {
+    pub(crate) use crate::finding_admission_vocabulary::{
+        VerifiedFindingRecovery, FINDING_RECOVERY_REPLAY_SNAPSHOT_METADATA_KEY,
+    };
+}
 #[cfg(not(loom))]
 pub mod governed_approval_replay;
 #[cfg(not(loom))]
@@ -417,23 +432,23 @@ pub use chio_core::market::{
     MAX_LIABILITY_CLAIM_WORKFLOW_LIMIT, MAX_LIABILITY_MARKET_WORKFLOW_LIMIT,
     MAX_LIABILITY_PROVIDER_LIST_LIMIT,
 };
-#[cfg(not(loom))]
+#[cfg(all(not(loom), feature = "finding-market"))]
 pub use chio_core::open_market::evaluation::{
     evaluate_open_market_penalty, evaluate_open_market_penalty_with_trusted_signers,
     OpenMarketPenaltyEvaluation, OpenMarketPenaltyEvaluationRequest,
 };
-#[cfg(not(loom))]
+#[cfg(all(not(loom), feature = "finding-market"))]
 pub use chio_core::open_market::evidence::{
     OpenMarketEvidenceKind, OpenMarketEvidenceReference, OpenMarketFinding, OpenMarketFindingCode,
 };
-#[cfg(not(loom))]
+#[cfg(all(not(loom), feature = "finding-market"))]
 pub use chio_core::open_market::fee_schedule::{
     build_open_market_fee_schedule_artifact, OpenMarketBondClass, OpenMarketBondRequirement,
     OpenMarketCollateralReferenceKind, OpenMarketEconomicsScope, OpenMarketFeeScheduleArtifact,
     OpenMarketFeeScheduleIssueRequest, SignedOpenMarketFeeSchedule,
     OPEN_MARKET_FEE_SCHEDULE_ARTIFACT_SCHEMA,
 };
-#[cfg(not(loom))]
+#[cfg(all(not(loom), feature = "finding-market"))]
 pub use chio_core::open_market::penalty::{
     build_open_market_penalty_artifact, build_open_market_penalty_artifact_with_trusted_signers,
     OpenMarketAbuseClass, OpenMarketPenaltyAction, OpenMarketPenaltyArtifact,

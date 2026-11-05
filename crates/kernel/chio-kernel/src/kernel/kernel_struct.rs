@@ -636,10 +636,13 @@ pub struct ChioKernel {
     /// retention is unconfigured or before a store is attached.
     pub(super) retention_maintenance: Option<crate::receipt_store::RetentionMaintenanceHandle>,
     pub(super) payment_adapter: Option<Box<dyn PaymentAdapter>>,
+    #[cfg(feature = "finding-market")]
     pub(super) finding_purchase_verifier:
         Option<Arc<dyn crate::finding_purchase::FindingPurchaseVerifier>>,
+    #[cfg(feature = "finding-market")]
     pub(super) finding_recovery_verifier:
         Option<Arc<dyn crate::finding_recovery::FindingRecoveryVerifier>>,
+    #[cfg(feature = "finding-market")]
     pub(super) finding_status_proof_verifier:
         Option<Arc<dyn crate::finding_purchase::FindingStatusProofVerifier>>,
     /// Kernel keys explicitly trusted to issue Finding delivery receipts that

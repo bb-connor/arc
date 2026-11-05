@@ -356,8 +356,11 @@ impl ChioKernel {
             publication_sync: Arc::new(super::publication_sync::PublicationSync::default()),
             retention_maintenance: None,
             payment_adapter: None,
+            #[cfg(feature = "finding-market")]
             finding_purchase_verifier: None,
+            #[cfg(feature = "finding-market")]
             finding_recovery_verifier: None,
+            #[cfg(feature = "finding-market")]
             finding_status_proof_verifier: None,
             finding_delivery_receipt_authorities: Vec::new(),
             #[cfg(feature = "finding-market")]
@@ -1014,6 +1017,7 @@ impl ChioKernel {
     /// Install the purchase-context verifier for delivery-committed
     /// finding reveals. Without one, every purchase-marked grant denies
     /// before dispatch.
+    #[cfg(feature = "finding-market")]
     pub fn set_finding_purchase_verifier(
         &mut self,
         verifier: Arc<dyn crate::finding_purchase::FindingPurchaseVerifier>,
@@ -1023,6 +1027,7 @@ impl ChioKernel {
 
     /// Install no-charge finding-recovery verification and durable quota
     /// handling. Without one, every recovery-marked grant denies.
+    #[cfg(feature = "finding-market")]
     pub fn set_finding_recovery_verifier(
         &mut self,
         verifier: Arc<dyn crate::finding_recovery::FindingRecoveryVerifier>,
@@ -1033,6 +1038,7 @@ impl ChioKernel {
     /// Install the portable status-proof verifier. Every purchase-marked
     /// reveal denies until this verifier is installed and then requires a
     /// fresh verified non-inclusion proof.
+    #[cfg(feature = "finding-market")]
     pub fn set_finding_status_proof_verifier(
         &mut self,
         verifier: Arc<dyn crate::finding_purchase::FindingStatusProofVerifier>,
