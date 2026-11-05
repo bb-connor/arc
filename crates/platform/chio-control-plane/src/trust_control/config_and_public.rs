@@ -387,7 +387,7 @@ fn configured_enterprise_provider_registry_path(
     })
 }
 
-fn configured_federation_policy_registry_path(
+pub(crate) fn configured_federation_policy_registry_path(
     config: &TrustServiceConfig,
 ) -> Result<&Path, CliError> {
     config.federation_policies_file.as_deref().ok_or_else(|| {
@@ -553,14 +553,8 @@ pub(crate) fn load_enterprise_provider_registry_for_admin(
 
 pub(crate) fn load_federation_policy_registry_for_admin(
     config: &TrustServiceConfig,
-) -> Result<(PathBuf, FederationAdmissionPolicyRegistry), CliError> {
-    let path = configured_federation_policy_registry_path(config)?.to_path_buf();
-    let registry = if path.exists() {
-        FederationAdmissionPolicyRegistry::load(&path)?
-    } else {
-        FederationAdmissionPolicyRegistry::default()
-    };
-    Ok((path, registry))
+) -> Result<FederationAdmissionPolicyRegistry, CliError> {
+    FederationAdmissionPolicyRegistry::load(configured_federation_policy_registry_path(config)?)
 }
 
 pub(crate) fn load_scim_lifecycle_registry_for_admin(

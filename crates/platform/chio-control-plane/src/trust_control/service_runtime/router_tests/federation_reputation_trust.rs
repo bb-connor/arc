@@ -97,22 +97,21 @@ impl Fixture {
             visibility_only_without_activation: true,
             note: None,
         };
-        let mut registry = FederationAdmissionPolicyRegistry::default();
-        registry.upsert(FederationAdmissionPolicyRecord {
+        let record = FederationAdmissionPolicyRecord {
             schema: crate::federation_policy::FEDERATION_ADMISSION_POLICY_RECORD_SCHEMA.to_string(),
             published_at: self.now,
             policy: SignedFederatedOpenAdmissionPolicy::sign(artifact, &self.admitted)?,
             anti_sybil: Default::default(),
             minimum_reputation_score,
             note: None,
-        })?;
-        registry.save(
-            self.state
-                .config
-                .federation_policies_file
-                .as_deref()
-                .ok_or("policy path")?,
-        )?;
+        };
+        let path = self
+            .state
+            .config
+            .federation_policies_file
+            .as_deref()
+            .ok_or("policy path")?;
+        FederationAdmissionPolicyRegistry::update(path, |registry| registry.upsert(record))?;
         Ok(())
     }
 

@@ -277,7 +277,12 @@ async fn ingress_nested_signed_certification_is_checked_before_network_dispatch(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let temp = tempfile::tempdir()?;
     let path = temp.path().join("network.json");
-    crate::enterprise_federation::CertificationDiscoveryNetwork::default().save(&path)?;
+    std::fs::write(
+        &path,
+        serde_json::to_vec(
+            &crate::enterprise_federation::CertificationDiscoveryNetwork::default(),
+        )?,
+    )?;
     let before = std::fs::read(&path)?;
     let mut state = metrics_state("service-secret");
     state.config.certification_discovery_file = Some(path.clone());

@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -304,11 +303,6 @@ impl EnterpriseProviderRegistry {
         )
     }
 
-    #[cfg(test)]
-    pub fn save(&self, path: &Path) -> Result<(), CliError> {
-        crate::signed_input::write_bounded_json(path, &self.clone().with_revalidated_records()?)
-    }
-
     pub fn validated_provider(&self, provider_id: &str) -> Option<&EnterpriseProviderRecord> {
         self.providers
             .get(provider_id)
@@ -355,42 +349,13 @@ impl EnterpriseProviderRegistry {
 
 impl CertificationDiscoveryNetwork {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        let bytes = fs::read(path).map_err(|error| {
+        let bytes = crate::signed_input::read_bounded(path).map_err(|error| {
             CliError::cli_io_error(format!(
                 "failed to read certification discovery network {}: {error}",
                 path.display()
             ))
         })?;
-        let network = chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
-            .and_then(|input| input.decode_signed::<Self>())
-            .map_err(CliError::from)?;
-        network.with_revalidated_records()
-    }
-
-    pub fn save(&self, path: &Path) -> Result<(), CliError> {
-        let network = self.clone().with_revalidated_records()?;
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|error| {
-                    CliError::cli_io_error(format!(
-                        "failed to create certification discovery network directory {}: {error}",
-                        parent.display()
-                    ))
-                })?;
-            }
-        }
-        let serialized = serde_json::to_vec_pretty(&network).map_err(|error| {
-            CliError::cli_json_error(format!(
-                "failed to serialize certification discovery network {}: {error}",
-                path.display()
-            ))
-        })?;
-        fs::write(path, serialized).map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to write certification discovery network {}: {error}",
-                path.display()
-            ))
-        })
+        crate::signed_input::decode::<Self>(&bytes)?.with_revalidated_records()
     }
 
     pub fn validated_operator(&self, operator_id: &str) -> Option<&CertificationDiscoveryOperator> {
@@ -504,7 +469,6 @@ mod jwt_provider_profile_serde {
 mod tests {
     use std::collections::BTreeMap;
     use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::{CliError, JwtProviderProfile};
 
@@ -570,22 +534,6 @@ mod tests {
             subject_mapping: subject_mapping(),
             validation_errors: Vec::new(),
         }
-    }
-
-    fn temp_registry_path() -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .test_unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("chio-enterprise-provider-registry-{nonce}.json"))
-    }
-
-    fn temp_discovery_path() -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .test_unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("chio-certify-discovery-network-{nonce}.json"))
     }
 
     fn assert_registry_error(err: &CliError, expected_code: &str, expected_domain: &str) {
@@ -727,16 +675,14 @@ mod tests {
 
     #[test]
     fn enterprise_provider_registry_round_trips_validation_state() {
-        let path = temp_registry_path();
-        let mut registry = EnterpriseProviderRegistry {
-            version: ENTERPRISE_PROVIDER_REGISTRY_VERSION.to_string(),
-            providers: BTreeMap::new(),
-        };
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let path = directory.path().join("enterprise-providers.json");
         let mut invalid_record = provider_record("oidc", EnterpriseProviderKind::OidcJwks);
         invalid_record.issuer = None;
-        registry.upsert(invalid_record.clone());
-
-        registry.save(&path).test_unwrap();
+        EnterpriseProviderRegistry::update(&path, |registry| {
+            Ok::<_, CliError>(registry.upsert(invalid_record.clone()))
+        })
+        .test_unwrap();
         let loaded = EnterpriseProviderRegistry::load(&path).test_unwrap();
 
         assert_eq!(loaded.version, ENTERPRISE_PROVIDER_REGISTRY_VERSION);
@@ -744,13 +690,12 @@ mod tests {
             loaded.providers.get("oidc").test_unwrap().validation_errors,
             invalid_record.validate()
         );
-
-        let _ = fs::remove_file(path);
     }
 
     #[test]
     fn enterprise_provider_registry_rejects_mismatched_map_key() {
-        let path = temp_registry_path();
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let path = directory.path().join("enterprise-providers.json");
         let mut registry = EnterpriseProviderRegistry {
             version: ENTERPRISE_PROVIDER_REGISTRY_VERSION.to_string(),
             providers: BTreeMap::new(),
@@ -765,7 +710,6 @@ mod tests {
             EnterpriseProviderRegistry::load(&path),
             "provider map key mismatch should fail closed",
         );
-        let _ = fs::remove_file(path);
 
         assert!(
             error
@@ -777,23 +721,23 @@ mod tests {
 
     #[test]
     fn enterprise_provider_registry_local_failures_preserve_typed_domains() {
-        let missing_path = temp_registry_path();
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let missing_path = directory.path().join("missing_path.json");
         let missing_error = must_err(
             EnterpriseProviderRegistry::load(&missing_path),
             "missing registry should fail closed",
         );
         assert_registry_error(&missing_error, "urn:chio:error:cli:io", "cli");
 
-        let invalid_json_path = temp_registry_path();
+        let invalid_json_path = directory.path().join("invalid_json_path.json");
         write_test_file(&invalid_json_path, b"{not-json");
         let json_error = must_err(
             EnterpriseProviderRegistry::load(&invalid_json_path),
             "invalid registry JSON should fail closed",
         );
         assert_signed_input_error(&json_error);
-        let _ = fs::remove_file(invalid_json_path);
 
-        let unsupported_version_path = temp_registry_path();
+        let unsupported_version_path = directory.path().join("unsupported_version_path.json");
         write_test_file(
             &unsupported_version_path,
             r#"{"version":"unsupported","providers":{}}"#,
@@ -803,7 +747,6 @@ mod tests {
             "unsupported registry version should fail closed",
         );
         assert_registry_error(&version_error, "urn:chio:error:cli:other", "cli");
-        let _ = fs::remove_file(unsupported_version_path);
     }
 
     #[test]
@@ -833,7 +776,8 @@ mod tests {
 
     #[test]
     fn certification_discovery_network_round_trips_validation_state() {
-        let path = temp_discovery_path();
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let path = directory.path().join("discovery-network.json");
         let mut network = CertificationDiscoveryNetwork {
             version: CERTIFICATION_DISCOVERY_NETWORK_VERSION.to_string(),
             operators: BTreeMap::new(),
@@ -842,7 +786,7 @@ mod tests {
         invalid.registry_url = "west.example.com".to_string();
         network.upsert(invalid.clone());
 
-        network.save(&path).test_unwrap();
+        write_test_file(&path, serde_json::to_vec(&network).test_unwrap());
         let loaded = CertificationDiscoveryNetwork::load(&path).test_unwrap();
 
         assert_eq!(loaded.version, CERTIFICATION_DISCOVERY_NETWORK_VERSION);
@@ -850,22 +794,20 @@ mod tests {
             loaded.operators.get("west").test_unwrap().validation_errors,
             invalid.validate()
         );
-
-        let _ = fs::remove_file(path);
     }
 
     #[test]
     fn certification_discovery_network_local_failures_preserve_typed_domains() {
-        let invalid_json_path = temp_discovery_path();
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let invalid_json_path = directory.path().join("invalid_json_path.json");
         write_test_file(&invalid_json_path, b"{not-json");
         let json_error = must_err(
             CertificationDiscoveryNetwork::load(&invalid_json_path),
             "invalid discovery JSON should fail closed",
         );
         assert_signed_input_error(&json_error);
-        let _ = fs::remove_file(invalid_json_path);
 
-        let unsupported_version_path = temp_discovery_path();
+        let unsupported_version_path = directory.path().join("unsupported_version_path.json");
         write_test_file(
             &unsupported_version_path,
             r#"{"version":"unsupported","operators":{}}"#,
@@ -875,7 +817,55 @@ mod tests {
             "unsupported discovery version should fail closed",
         );
         assert_registry_error(&version_error, "urn:chio:error:cli:other", "cli");
-        let _ = fs::remove_file(unsupported_version_path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn certification_discovery_network_load_refuses_a_symlink() {
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let target = directory.path().join("network.json");
+        write_test_file(
+            &target,
+            serde_json::to_vec(&CertificationDiscoveryNetwork::default()).test_unwrap(),
+        );
+        let link = directory.path().join("linked.json");
+        std::os::unix::fs::symlink(&target, &link).test_unwrap();
+
+        let error = must_err(
+            CertificationDiscoveryNetwork::load(&link),
+            "a symlinked discovery network should fail closed",
+        );
+
+        assert_registry_error(&error, "urn:chio:error:cli:io", "cli");
+    }
+
+    #[test]
+    fn certification_discovery_network_load_is_capped_at_the_signed_input_limit() {
+        use crate::signed_input::MAX_SIGNED_FILE_BYTES;
+        use chio_core::canonical::UntrustedJsonError;
+
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let path = directory.path().join("discovery-network.json");
+        let file = fs::File::create(&path).test_unwrap();
+        for (len, refused_as_too_large) in [
+            (MAX_SIGNED_FILE_BYTES, false),
+            (MAX_SIGNED_FILE_BYTES + 1, true),
+        ] {
+            file.set_len(u64::try_from(len).test_unwrap()).test_unwrap();
+            let error = must_err(
+                CertificationDiscoveryNetwork::load(&path),
+                "a zero-filled discovery network is not a valid document",
+            );
+            assert_eq!(
+                matches!(
+                    error,
+                    CliError::SignedJson(UntrustedJsonError::TooLarge { bound, .. })
+                        if bound == MAX_SIGNED_FILE_BYTES
+                ),
+                refused_as_too_large,
+                "{len} bytes: {error:?}"
+            );
+        }
     }
 
     #[test]
