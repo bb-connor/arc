@@ -1010,7 +1010,10 @@ pub(super) fn cmd_finding_operator_init(
     Ok(())
 }
 
-pub(super) fn cmd_finding_operator_serve(profile_path: &Path) -> Result<(), CliError> {
+pub(super) fn cmd_finding_operator_serve(
+    profile_path: &Path,
+    egress: &Arc<chio_egress_contract::EgressAllowanceSet>,
+) -> Result<(), CliError> {
     set_operator_umask();
     let (profile, root) = load_profile(profile_path)?;
     let paths = ResolvedOperatorPaths::new(&root, &profile.paths);
@@ -1107,7 +1110,7 @@ pub(super) fn cmd_finding_operator_serve(profile_path: &Path) -> Result<(), CliE
     );
     let challenge_runtime = FindingChallengeSubmissionRuntime::new(authority, challenge)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    let config = trust_config(&profile, &paths)?;
+    let config = trust_config(&profile, &paths, egress)?;
     chio_control_plane::trust_control::serve_with_finding_operator_market_runtime(
         config,
         challenge_runtime,
@@ -1182,6 +1185,7 @@ impl ResolvedOperatorPaths {
 fn trust_config(
     profile: &FindingOperatorProfile,
     paths: &ResolvedOperatorPaths,
+    egress: &Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<TrustServiceConfig, CliError> {
     let access = chio_control_plane::trust_control::caller_credentials::TrustAccess::single_client(
         "finding-operator",
@@ -1217,7 +1221,7 @@ fn trust_config(
         issuance_policy: None,
         runtime_assurance_policy: None,
         advertise_url: Some(format!("http://{}", profile.listen)),
-        allow_local_peer_urls: true,
+        egress_allowances: Arc::clone(egress),
         certification_public_metadata_ttl_seconds: 300,
         cluster_sync_interval: Duration::from_millis(250),
         authority_replication_max_future_skew_seconds: 0,

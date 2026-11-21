@@ -4,19 +4,24 @@ use super::super::client::{
     certification_marketplace_transparency_path, encode_path_segment, path_with_encoded_param,
 };
 use super::support::{assert_bearer_request, assert_json_post, StaticResponseServer};
+use chio_egress_contract::EgressAllowanceSet;
 use chio_test_support::prelude::*;
 use std::collections::BTreeMap;
 
 #[test]
 fn build_client_rejects_empty_control_url_and_normalizes_endpoints() {
-    let error = match build_client(" , , ", "token") {
+    let error = match build_client(" , , ", "token", &EgressAllowanceSet::default()) {
         Ok(_) => panic!("empty control URL should fail"),
         Err(error) => error,
     };
     assert!(error.to_string().contains("control URL must not be empty"));
 
-    let client = build_client(" https://one/ , https://two// ,,", "secret")
-        .test_expect("build client with normalized endpoints");
+    let client = build_client(
+        " https://one/ , https://two// ,,",
+        "secret",
+        &EgressAllowanceSet::default(),
+    )
+    .test_expect("build client with normalized endpoints");
     assert_eq!(
         client.endpoints.as_ref(),
         &vec!["https://one".to_string(), "https://two".to_string()]
@@ -30,7 +35,11 @@ fn build_client_rejects_empty_control_url_and_normalizes_endpoints() {
 #[test]
 fn build_client_rejects_blank_or_padded_control_token() {
     for token in ["", "   ", " secret", "secret "] {
-        let error = match build_client("http://control.example.test", token) {
+        let error = match build_client(
+            "http://control.example.test",
+            token,
+            &EgressAllowanceSet::default(),
+        ) {
             Ok(_) => panic!("blank or padded control token should fail"),
             Err(error) => error,
         };
@@ -43,8 +52,11 @@ fn build_client_rejects_blank_or_padded_control_token() {
 
 #[test]
 fn build_public_client_allows_empty_token_for_public_endpoints_and_keeps_endpoint_validation() {
-    let client = build_public_client(" https://one/ , https://two// ,,")
-        .test_expect("build public client with normalized endpoints");
+    let client = build_public_client(
+        " https://one/ , https://two// ,,",
+        &EgressAllowanceSet::default(),
+    )
+    .test_expect("build public client with normalized endpoints");
     assert_eq!(
         client.endpoints.as_ref(),
         &vec!["https://one".to_string(), "https://two".to_string()]
@@ -58,7 +70,7 @@ fn build_public_client_allows_empty_token_for_public_endpoints_and_keeps_endpoin
         "https://control.example.test?token=secret",
         "https://control.example.test#fragment",
     ] {
-        let error = match build_public_client(endpoint) {
+        let error = match build_public_client(endpoint, &EgressAllowanceSet::default()) {
             Ok(_) => panic!("malformed or ambiguous public control endpoint should fail"),
             Err(error) => error,
         };
@@ -78,7 +90,7 @@ fn build_client_rejects_malformed_or_ambient_authority_endpoints() {
         "https://control.example.test?token=secret",
         "https://control.example.test#fragment",
     ] {
-        let error = match build_client(endpoint, "secret") {
+        let error = match build_client(endpoint, "secret", &EgressAllowanceSet::default()) {
             Ok(_) => panic!("malformed or ambiguous control endpoint should fail"),
             Err(error) => error,
         };
@@ -127,17 +139,21 @@ fn path_helpers_encode_segments_and_certification_paths() {
 fn request_json_retries_retryable_status_and_marks_preferred_endpoint() {
     let retry = StaticResponseServer::spawn(503, "{\"error\":\"retry\"}", "application/json", 1);
     let success = StaticResponseServer::spawn(200, "{\"ok\":true}", "application/json", 1);
-    let client = build_client(&format!("{},{}", retry.url, success.url), "secret")
-        .test_expect("build failover client");
+    let client = build_client(
+        &format!("{},{}", retry.url, success.url),
+        "secret",
+        &EgressAllowanceSet::default(),
+    )
+    .test_expect("build failover client");
 
     let response: Value = client
         .request_json(
             |agent, url, token| {
                 assert_eq!(token, "secret");
                 agent
-                    .get(url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
-                    .call()
+                    .get(url)?
+                    .header(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .call_streaming()
             },
             "/status",
         )
@@ -150,10 +166,11 @@ fn request_json_retries_retryable_status_and_marks_preferred_endpoint() {
 #[test]
 fn request_text_without_service_auth_reads_text_response() {
     let server = StaticResponseServer::spawn(200, "ready", "text/plain", 1);
-    let client = build_client(&server.url, "secret").test_expect("build text client");
+    let client = build_client(&server.url, "secret", &EgressAllowanceSet::default())
+        .test_expect("build text client");
 
     let body = client
-        .request_text_without_service_auth(|agent, url| agent.get(url).call(), "/health")
+        .request_text_without_service_auth(|agent, url| agent.get(url)?.call_streaming(), "/health")
         .test_expect("read text response");
 
     assert_eq!(body, "ready");
@@ -162,7 +179,8 @@ fn request_text_without_service_auth_reads_text_response() {
 #[test]
 fn trust_control_get_wrappers_encode_queries_and_service_auth() {
     let server = StaticResponseServer::spawn(200, "{}", "application/json", 25);
-    let client = build_client(&server.url, "secret").test_expect("build client");
+    let client = build_client(&server.url, "secret", &EgressAllowanceSet::default())
+        .test_expect("build client");
 
     let _ = client.revocation_status("cap-1");
     let _ = client.list_tool_receipts(&ToolReceiptQuery {
@@ -621,7 +639,8 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
 #[test]
 fn trust_control_post_wrappers_send_json_bodies_and_encoded_paths() {
     let server = StaticResponseServer::spawn(200, "{}", "application/json", 7);
-    let client = build_client(&server.url, "secret").test_expect("build client");
+    let client = build_client(&server.url, "secret", &EgressAllowanceSet::default())
+        .test_expect("build client");
 
     let _ = client.issue_credit_facility(&CreditFacilityIssueRequest {
         query: ExposureLedgerQuery {
@@ -795,6 +814,7 @@ fn remote_receipt_store_append_fails_closed_at_the_configured_budget() {
     let store = super::super::remote_stores::build_remote_receipt_store(
         &format!("http://{addr}"),
         "secret",
+        &EgressAllowanceSet::default(),
     )
     .test_expect("build remote receipt store");
     let receipt = sample_tool_receipt("receipt-budget");
@@ -833,6 +853,7 @@ fn remote_receipt_store_capability_snapshot_fails_closed_at_the_configured_budge
     let store = super::super::remote_stores::build_remote_receipt_store(
         &format!("http://{addr}"),
         "secret",
+        &EgressAllowanceSet::default(),
     )
     .test_expect("build remote receipt store");
     let token = sample_capability_token();
@@ -1053,8 +1074,12 @@ fn remote_receipt_store_point_loads_tool_receipt_by_id() {
     let body = receipt_list_response_body("tool", vec![value]);
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
 
-    let store = super::super::remote_stores::build_remote_receipt_store(&server.url, "secret")
-        .test_expect("build remote receipt store");
+    let store = super::super::remote_stores::build_remote_receipt_store(
+        &server.url,
+        "secret",
+        &EgressAllowanceSet::default(),
+    )
+    .test_expect("build remote receipt store");
     let loaded = store
         .load_chio_receipt(&expected_id)
         .test_expect("point load must not error");
@@ -1074,8 +1099,12 @@ fn remote_receipt_store_point_loads_child_receipt_by_id() {
     let body = receipt_list_response_body("child", vec![value]);
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
 
-    let store = super::super::remote_stores::build_remote_receipt_store(&server.url, "secret")
-        .test_expect("build remote receipt store");
+    let store = super::super::remote_stores::build_remote_receipt_store(
+        &server.url,
+        "secret",
+        &EgressAllowanceSet::default(),
+    )
+    .test_expect("build remote receipt store");
     let loaded = store
         .load_child_receipt("child-receipt-evicted-1")
         .test_expect("point load must not error");
@@ -1093,8 +1122,12 @@ fn remote_receipt_store_point_load_miss_returns_none() {
     let body = receipt_list_response_body("tool", Vec::new());
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
 
-    let store = super::super::remote_stores::build_remote_receipt_store(&server.url, "secret")
-        .test_expect("build remote receipt store");
+    let store = super::super::remote_stores::build_remote_receipt_store(
+        &server.url,
+        "secret",
+        &EgressAllowanceSet::default(),
+    )
+    .test_expect("build remote receipt store");
     let loaded = store
         .load_chio_receipt("receipt-absent")
         .test_expect("point load must not error on a miss");
@@ -1115,8 +1148,12 @@ fn remote_tool_point_load_rejects_mismatched_receipt_id() {
     let body = receipt_list_response_body("tool", vec![value]);
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
 
-    let store = super::super::remote_stores::build_remote_receipt_store(&server.url, "secret")
-        .test_expect("build remote receipt store");
+    let store = super::super::remote_stores::build_remote_receipt_store(
+        &server.url,
+        "secret",
+        &EgressAllowanceSet::default(),
+    )
+    .test_expect("build remote receipt store");
     // Ask for a DIFFERENT id than the server returns.
     let requested_id = format!("{returned_id}-not-this-one");
     let loaded = store
@@ -1138,8 +1175,12 @@ fn remote_child_point_load_rejects_mismatched_receipt_id() {
     let body = receipt_list_response_body("child", vec![value]);
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
 
-    let store = super::super::remote_stores::build_remote_receipt_store(&server.url, "secret")
-        .test_expect("build remote receipt store");
+    let store = super::super::remote_stores::build_remote_receipt_store(
+        &server.url,
+        "secret",
+        &EgressAllowanceSet::default(),
+    )
+    .test_expect("build remote receipt store");
     let loaded = store
         .load_child_receipt("a-different-child-id")
         .test_expect("point load must not error");

@@ -333,6 +333,10 @@ impl BlockingContractAgent {
         self.request("DELETE", url)
     }
 
+    pub fn put(&self, url: &str) -> Result<BlockingContractRequest, HttpEgressError> {
+        self.request("PUT", url)
+    }
+
     fn request(
         &self,
         method: &'static str,

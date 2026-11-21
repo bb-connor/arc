@@ -65,6 +65,7 @@ pub(crate) fn dispatch_finding(
     json_output: bool,
     control_url: Option<String>,
     control_token: Option<String>,
+    egress: &std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<(), CliError> {
     match command {
         FindingCommands::Operator { command } => match command {
@@ -86,7 +87,9 @@ pub(crate) fn dispatch_finding(
                 &seller_payout,
                 json_output,
             ),
-            FindingOperatorCommands::Serve { profile } => cmd_finding_operator_serve(&profile),
+            FindingOperatorCommands::Serve { profile } => {
+                cmd_finding_operator_serve(&profile, egress)
+            }
             FindingOperatorCommands::Tick { profile } => {
                 cmd_finding_operator_tick(&profile, json_output)
             }

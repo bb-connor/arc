@@ -10,7 +10,6 @@ reqwest	crates/tooling/chio-conformance/src/runner/restart_probe.rs	loopback res
 reqwest	crates/tooling/chio-conformance/verdict_matrix/drivers/lambda/src/lib.rs	verdict-matrix driver for an operator-supplied sidecar URL
 reqwest	examples/reference-swarm/src/edge.rs	operator-run example reaching the Chio edges of its own reference stack
 reqwest	examples/reference-swarm/src/trust.rs	operator-run example reaching the trust-control service of its own reference stack
-ureq	crates/platform/chio-control-plane/src/trust_control/service_runtime/client/factory.rs	trust-control client for operator-configured endpoints, redirects off
 ureq	crates/products/chio-cli/src/cli/dispatch/finding.rs	operator CLI request to the --control-url venue
 ureq	crates/products/chio-cli/src/cli/dispatch/finding/challenge.rs	operator CLI request to the --control-url venue
 ureq	crates/products/chio-cli/src/cli/dispatch/finding/operator.rs	operator CLI request to the --control-url venue

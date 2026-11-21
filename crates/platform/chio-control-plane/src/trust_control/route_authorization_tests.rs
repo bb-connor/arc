@@ -107,7 +107,7 @@ fn route_table_covers_every_router_route() {
         })
         .collect();
     table.sort();
-    assert_eq!(router.len(), 213);
+    assert_eq!(router.len(), 214);
     let mut unique = router.clone();
     unique.dedup();
     assert_eq!(

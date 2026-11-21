@@ -7,6 +7,7 @@ pub(crate) const CSP_VALUE: &str = "default-src 'self'; script-src 'self'; \
     style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:";
 
 pub(crate) const HEALTH_PATH: &str = "/health";
+pub(crate) const EGRESS_ALLOWANCES_PATH: &str = "/v1/egress-allowances";
 pub(crate) const AUTHORITY_PATH: &str = "/v1/authority";
 pub(crate) const AUTHORITY_KEY_LOG_SYNC_PATH: &str = "/v1/authority/key-log/sync";
 pub(crate) const ISSUE_CAPABILITY_PATH: &str = "/v1/capabilities/issue";

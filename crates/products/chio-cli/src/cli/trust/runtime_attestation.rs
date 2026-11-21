@@ -1,4 +1,5 @@
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 pub(crate) fn parse_governed_autonomy_tier(value: &str) -> Result<GovernedAutonomyTier, CliError> {
     crate::input::literal(value).map_err(|_| {
@@ -38,11 +39,12 @@ pub(crate) fn cmd_trust_runtime_attestation_appraisal_export(
     authority_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let evidence = load_runtime_attestation_evidence(input_path)?;
     let report = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, egress)?
             .runtime_attestation_appraisal(&RuntimeAttestationAppraisalRequest {
                 runtime_attestation: evidence,
             })?
@@ -110,11 +112,12 @@ pub(crate) fn cmd_trust_runtime_attestation_appraisal_result_export(
     authority_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let evidence = load_runtime_attestation_evidence(input_path)?;
     let result = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, egress)?
             .runtime_attestation_appraisal_result(
                 &RuntimeAttestationAppraisalResultExportRequest {
                     issuer: issuer.to_string(),
@@ -168,6 +171,7 @@ pub(crate) fn cmd_trust_runtime_attestation_appraisal_import(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let request = RuntimeAttestationAppraisalImportRequest {
         signed_result: load_signed_runtime_attestation_appraisal_result(input_path)?,
@@ -176,7 +180,7 @@ pub(crate) fn cmd_trust_runtime_attestation_appraisal_import(
 
     let report = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, egress)?
             .import_runtime_attestation_appraisal(&request)?
     } else {
         trust_control::reports::build_runtime_attestation_appraisal_import_report(

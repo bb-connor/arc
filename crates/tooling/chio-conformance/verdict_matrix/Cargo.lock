@@ -1295,6 +1295,7 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+ "toml",
  "ureq",
  "url",
  "webpki-roots 0.26.11",

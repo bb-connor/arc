@@ -16,6 +16,7 @@ chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../cor
 serde = { workspace = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
+toml = { workspace = true }
 url = { workspace = true }
 http = { version = "1", optional = true }
 reqwest = { workspace = true, default-features = false, features = ["form", "json", "query", "rustls"], optional = true }
@@ -41,6 +42,7 @@ required-features = ["ureq-egress"]
 [dev-dependencies]
 rcgen = "0.13"
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 reqwest = { workspace = true, default-features = false, features = ["rustls", "http2"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 

@@ -1,5 +1,6 @@
 //! Partial legacy responses cannot invent fields of a durable usage projection.
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -181,7 +182,7 @@ pub(super) fn list_body(records: &[BudgetUsageRecord]) -> TestResult<String> {
 
 fn store(server: &ProjectionServer) -> TestResult<RemoteBudgetStore> {
     Ok(RemoteBudgetStore {
-        client: build_client(&server.url, "secret")?,
+        client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery: None,
     })

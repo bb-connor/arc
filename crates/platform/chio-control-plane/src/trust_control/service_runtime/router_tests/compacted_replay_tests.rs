@@ -14,6 +14,7 @@ use axum::http::Request;
 use axum::middleware::{from_fn_with_state, Next};
 use axum::response::{IntoResponse, Response};
 use chio_core::receipt::body::ChioReceipt;
+use chio_egress_contract::EgressAllowanceSet;
 use chio_kernel::tool_outcome::{ToolOutcomeStore, ToolOutcomeStoreError};
 use chio_kernel::{KernelError, ReceiptStoreError, Verdict};
 use rusqlite::{Connection, OpenFlags};
@@ -261,6 +262,7 @@ fn replay_fault(mode: u8, expected_code: &str, native: bool) -> TestResult {
         &host.url,
         &host.url,
         "payload-rpc-secret",
+        &EgressAllowanceSet::default(),
     )?;
     let recovered = configured_kernel(&remote, calls.clone())?;
     let before = head(&database)?;
@@ -424,6 +426,7 @@ fn compacted_payload_rpc_cold_reopen_replays_original_receipt_without_effects() 
         &host.url,
         &host.url,
         "payload-rpc-secret",
+        &EgressAllowanceSet::default(),
     )?;
     assert!(remote.local_authority_store().is_none());
     let recovered = configured_kernel(&remote, calls.clone())?;
@@ -433,6 +436,7 @@ fn compacted_payload_rpc_cold_reopen_replays_original_receipt_without_effects() 
             &host.url,
             "payload-rpc-secret",
             remote.kernel_keypair(),
+            &EgressAllowanceSet::default(),
         )?;
     let raw_error = ports
         .outcomes

@@ -17,10 +17,15 @@ mod validation;
 
 pub use factory::{build_client, build_public_client};
 
-pub(crate) use factory::build_cluster_peer_client;
+pub(crate) use factory::{build_cluster_peer_client, egress_refusal, is_transport_failure};
 #[cfg(test)]
 pub(crate) use validation::encode_path_segment;
 pub(crate) use validation::{
     certification_marketplace_search_path, certification_marketplace_transparency_path,
     path_with_encoded_param, should_retry_status,
 };
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[path = "client/egress_tests.rs"]
+mod egress_tests;

@@ -1,6 +1,7 @@
 use super::super::super::*;
 use super::super::budget::{build_remote_budget_store, build_shared_remote_budget_store};
 use super::support::{assert_json_post, StaticResponseServer};
+use chio_egress_contract::EgressAllowanceSet;
 use chio_kernel::admission_operation::StoreMutationFence;
 use chio_kernel::budget_store::{BudgetHoldDispositionView, BudgetHoldSnapshot};
 
@@ -43,7 +44,13 @@ fn fenced_hold_lookup_preserves_all_retained_fields() -> TestResult {
     let wire = RetainedBudgetHoldWire::from_core(expected.clone())?;
     let body = serde_json::to_string(&AdmissionAuthorityResponse::success(&Some(wire))?)?;
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-    let store = build_shared_remote_budget_store(&server.url, &server.url, "secret", fence())?;
+    let store = build_shared_remote_budget_store(
+        &server.url,
+        &server.url,
+        "secret",
+        fence(),
+        &EgressAllowanceSet::default(),
+    )?;
     let actual = store.get_budget_hold("retained-hold")?;
     assert_eq!(actual, Some(expected));
     let requests = server.requests();
@@ -65,10 +72,17 @@ fn only_an_authoritative_null_is_reported_as_absent() -> TestResult {
         &None::<RetainedBudgetHoldWire>,
     )?)?;
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-    let store = build_shared_remote_budget_store(&server.url, &server.url, "secret", fence())?;
+    let store = build_shared_remote_budget_store(
+        &server.url,
+        &server.url,
+        "secret",
+        fence(),
+        &EgressAllowanceSet::default(),
+    )?;
     assert_eq!(store.get_budget_hold("retained-hold")?, None);
     // Unqualified clients must fail before issuing a request, not claim absence.
-    let unqualified = build_remote_budget_store(&server.url, "secret")?;
+    let unqualified =
+        build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
     assert!(unqualified.get_budget_hold("retained-hold").is_err());
     assert_eq!(server.requests().len(), 1);
     Ok(())
@@ -85,7 +99,13 @@ fn hold_lookup_rejects_unavailable_fenced_and_ambiguous_responses() -> TestResul
         let response = AdmissionAuthorityResponse::failure(code, "authority refused lookup");
         let body = serde_json::to_string(&response)?;
         let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-        let store = build_shared_remote_budget_store(&server.url, &server.url, "secret", fence())?;
+        let store = build_shared_remote_budget_store(
+            &server.url,
+            &server.url,
+            "secret",
+            fence(),
+            &EgressAllowanceSet::default(),
+        )?;
         assert!(store.get_budget_hold("retained-hold").is_err());
     }
     let valid = serde_json::to_value(AdmissionAuthorityResponse::success(&Some(
@@ -119,7 +139,13 @@ fn hold_lookup_rejects_unavailable_fenced_and_ambiguous_responses() -> TestResul
             "application/json",
             1,
         );
-        let store = build_shared_remote_budget_store(&server.url, &server.url, "secret", fence())?;
+        let store = build_shared_remote_budget_store(
+            &server.url,
+            &server.url,
+            "secret",
+            fence(),
+            &EgressAllowanceSet::default(),
+        )?;
         assert!(
             store.get_budget_hold("retained-hold").is_err(),
             "accepted {mutation}"

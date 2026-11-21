@@ -679,6 +679,7 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
         wrapped_command: "/bin/true".to_string(),
         wrapped_args: vec![],
         egress_contract: None,
+        egress_allowances: Arc::new(chio_egress_contract::EgressAllowanceSet::default()),
     }
 }
 

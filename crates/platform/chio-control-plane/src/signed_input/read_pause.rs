@@ -26,6 +26,7 @@ impl ReadPause {
         path: &Path,
         bound: Duration,
     ) -> std::io::Result<(Self, tokio::sync::mpsc::UnboundedReceiver<()>)> {
+        chio_secure_ipc::regular_file::test_support::set_read_hook(wait);
         let metadata = std::fs::metadata(path)?;
         let identity = (metadata.dev(), metadata.ino());
         let (entered, receiver) = tokio::sync::mpsc::unbounded_channel();
@@ -74,11 +75,11 @@ impl Drop for ReadPause {
     }
 }
 
-pub(super) fn wait(metadata: &std::fs::Metadata) {
+fn wait(dev: u64, ino: u64) {
     let barrier = BARRIERS
         .lock()
         .unwrap_or_else(|error| error.into_inner())
-        .remove(&(metadata.dev(), metadata.ino()));
+        .remove(&(dev, ino));
     if let Some(barrier) = barrier {
         let _ = barrier.entered.send(());
         let _ = barrier.released.recv_timeout(barrier.bound);

@@ -1,5 +1,6 @@
 //! The operator-pinned builder must preserve its owner's authority time.
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 fn pinned(
     clock: Arc<MutableClock>,
@@ -17,6 +18,7 @@ fn pinned(
         current.clone(),
         vec![old.clone(), old.clone()],
         clock,
+        &EgressAllowanceSet::default(),
     )?;
     Ok((authority, server, old, current))
 }
@@ -79,6 +81,7 @@ fn f048_legacy_pinned_builder_keeps_compatible_pin_validation() -> TestResult {
         "test-only-control",
         current.clone(),
         vec![old.clone(), old, current.clone()],
+        &EgressAllowanceSet::default(),
     )?;
     assert_eq!(authority.authority_public_key()?, current);
     assert!(server.finish()? >= 1);

@@ -173,6 +173,7 @@ fn service_clock_is_shared_by_durable_admission_and_configured_budget_owners(
         approval: None,
         control_url: None,
         control_token: None,
+        control_egress_allowances: Default::default(),
         budget_db: Some(
             directory
                 .path()

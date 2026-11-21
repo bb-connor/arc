@@ -93,6 +93,7 @@ pub(crate) fn should_retry_status(status: u16) -> bool {
 #[cfg(test)]
 mod transport_tests {
     use super::*;
+    use chio_egress_contract::EgressAllowanceSet;
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
     #[test]
@@ -159,6 +160,7 @@ mod transport_tests {
         let client = super::super::factory::build_client(
             &format!("http://{source_addr}"),
             "transport-regression-token",
+            &EgressAllowanceSet::default(),
         )?;
         let error = client
             .revocation_status("test")

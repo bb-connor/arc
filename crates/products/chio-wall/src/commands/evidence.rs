@@ -70,7 +70,6 @@ pub(super) fn write_chio_evidence_package(
         false,
         Some(&receipt_db_path),
         None,
-        None,
         &kernel,
     )?;
 

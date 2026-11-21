@@ -87,6 +87,7 @@ pub(crate) struct QueryBackend<'a> {
     pub(crate) receipt_db_path: Option<&'a Path>,
     pub(crate) control_url: Option<&'a str>,
     pub(crate) control_token: Option<&'a str>,
+    pub(crate) egress: &'a chio_egress_contract::EgressAllowanceSet,
 }
 
 /// Derive a trusted-kernel-key list from an authority seed file. Returns the

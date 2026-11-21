@@ -358,6 +358,7 @@ pub(crate) async fn handle_publish_certification_network(
         &network,
         &request.artifact,
         &request.operator_ids,
+        &state.config.egress_allowances,
     ) {
         Ok(response) => Json(response).into_response(),
         Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),

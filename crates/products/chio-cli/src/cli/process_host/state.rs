@@ -536,6 +536,7 @@ pub(super) fn kernel_with_clock(
             None,
             issuance,
             assurance,
+            &crate::egress_allowance::none(),
         )?;
     }
     Ok(KernelAssembly {

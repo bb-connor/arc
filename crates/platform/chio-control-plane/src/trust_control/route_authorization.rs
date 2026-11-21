@@ -126,6 +126,7 @@ pub static ROUTE_TABLE: &[RouteRule] = &[
     route!(Get, PASSPORT_ISSUER_JWKS_PATH, Public, Anonymous, None, NotApplicable),
     route!(Get, PASSPORT_ISSUER_METADATA_PATH, Public, Anonymous, None, NotApplicable),
     route!(Get, HEALTH_PATH, Public, Anonymous, None, NotApplicable),
+    route!(Get, EGRESS_ALLOWANCES_PATH, Public, Caller, Some(Scope::MetricsRead), DeploymentOnly),
     route!(Get, "/metrics", Public, Caller, Some(Scope::MetricsRead), DeploymentOnly),
     route!(Post, SCIM_USERS_PATH, Public, Caller, Some(Scope::ScimWrite), DeploymentOnly),
     route!(Delete, SCIM_USER_PATH, Public, Caller, Some(Scope::ScimWrite), DeploymentOnly),

@@ -201,6 +201,7 @@ impl DurableAdmissionRuntime {
         control_url: &str,
         control_internal_url: &str,
         control_token: &str,
+        allowances: &chio_egress_contract::EgressAllowanceSet,
     ) -> Result<Self, CliError> {
         if identity_path
             .to_str()
@@ -220,11 +221,13 @@ impl DurableAdmissionRuntime {
                 control_internal_url,
                 control_token,
                 kernel_keypair.clone(),
+                allowances,
             )?;
         let revocations = Arc::from(
             crate::trust_control::service_runtime::remote_stores::build_remote_revocation_store(
                 control_url,
                 control_token,
+                allowances,
             )?,
         );
         Ok(Self {

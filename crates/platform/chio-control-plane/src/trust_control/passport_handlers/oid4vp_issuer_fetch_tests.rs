@@ -192,7 +192,7 @@ pub(super) fn config_with(
         issuance_policy: None,
         runtime_assurance_policy: None,
         advertise_url: Some(advertise_url.to_string()),
-        allow_local_peer_urls: true,
+        egress_allowances: Default::default(),
         certification_public_metadata_ttl_seconds: 300,
         cluster_sync_interval: Duration::from_millis(200),
         authority_replication_max_future_skew_seconds: 0,

@@ -1,4 +1,5 @@
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 /// An actual authenticated peer surface with a private runtime and dynamic URL.
 pub(super) struct LoopbackPeer {
@@ -170,6 +171,7 @@ impl AdmittedReplicationPair {
             let client = service_runtime::client::build_cluster_peer_client(
                 &local.state.config.access,
                 &remote.url,
+                &EgressAllowanceSet::default(),
             )?;
             let status = client.cluster_status()?;
             assert_eq!(status.self_url, remote.url);
@@ -229,7 +231,7 @@ fn unsigned_authority_plaintext_off_loopback_is_refused_even_with_local_override
         "http://[2001:db8::1]",
     ] {
         assert!(
-            matches!(normalize_cluster_config_url(url, true), Err(error)
+            matches!(normalize_cluster_config_url(url), Err(error)
             if error.to_string().contains("plaintext cluster URLs require a literal loopback address")),
             "plaintext accepted: {url}"
         );
@@ -240,7 +242,7 @@ fn unsigned_authority_plaintext_off_loopback_is_refused_even_with_local_override
         "http://[::1]:4000",
     ] {
         assert!(
-            normalize_cluster_config_url(url, true).is_ok(),
+            normalize_cluster_config_url(url).is_ok(),
             "valid transport refused: {url}"
         );
     }
@@ -275,6 +277,7 @@ pub(super) fn pull_snapshot(
     let client = crate::trust_control::service_runtime::client::build_cluster_peer_client(
         &client_access,
         &endpoint,
+        &EgressAllowanceSet::default(),
     )
     .test_unwrap();
     let result = sync_peer_authority(state, &client);
@@ -516,7 +519,9 @@ fn authority_replication_peer_client_rejects_plaintext_and_redirects() {
         &[&endpoint],
     );
     let client = crate::trust_control::service_runtime::client::build_cluster_peer_client(
-        &access, &endpoint,
+        &access,
+        &endpoint,
+        &EgressAllowanceSet::default(),
     )
     .test_unwrap();
     // A disabled redirect reaches the bounded decoder with this empty body.

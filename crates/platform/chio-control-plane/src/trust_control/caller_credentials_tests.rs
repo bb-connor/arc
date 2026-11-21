@@ -1966,3 +1966,25 @@ fn peer_signature_over_the_bare_payload_refused() {
         .test_unwrap_err();
     assert_eq!(refused, PeerAuthError::BadSignature);
 }
+
+#[test]
+fn pinned_peer_at_a_link_local_url_is_refused_at_load() {
+    let keypair = Keypair::generate();
+    let node = "https://node-b.example:9101";
+    let peer_text = format!(
+        "[[cluster.peers]]\nnode_id = \"{node}\"\ninternal_url = \"https://169.254.169.254:9101\"\npublic_key = \"{}\"\nscopes = [\"cluster:replicate\", \"cluster-openings:replicate\"]\n",
+        keypair.public_key().to_hex()
+    );
+    assert_eq!(
+        refusal(&config(&format!("{}{peer_text}", reader()))),
+        TrustAccessError::InvalidPeerUrl {
+            node_id: node.to_string(),
+            reason: crate::trust_control::service_runtime::client::egress_refusal(
+                chio_egress_contract::HttpEgressError::LinkLocalDenied {
+                    host: "169.254.169.254".to_string(),
+                }
+            )
+            .to_string(),
+        }
+    );
+}

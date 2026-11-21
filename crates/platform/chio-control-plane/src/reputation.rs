@@ -1,3 +1,4 @@
+use chio_egress_contract::EgressAllowanceSet;
 use std::path::Path;
 
 use chio_core::receipt::evidence::CapabilitySnapshot;
@@ -58,6 +59,7 @@ pub struct ReputationLocalCommand<'a> {
     /// set silently filters every receipt as unsigned and scores collapse
     /// to zero / unknown.
     pub authority_seed_file: Option<&'a Path>,
+    pub allowances: &'a EgressAllowanceSet,
 }
 
 #[allow(
@@ -77,6 +79,7 @@ pub fn cmd_reputation_local(command: ReputationLocalCommand<'_>) -> Result<(), C
         control_url,
         control_token,
         authority_seed_file,
+        allowances,
     } = command;
 
     let mut inspection = if let Some(url) = control_url {
@@ -87,10 +90,11 @@ pub fn cmd_reputation_local(command: ReputationLocalCommand<'_>) -> Result<(), C
             ));
         }
         let token = super::require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?.local_reputation(
-            subject_public_key,
-            &trust_control::LocalReputationQuery { since, until },
-        )?
+        trust_control::service_runtime::client::build_client(url, token, allowances)?
+            .local_reputation(
+                subject_public_key,
+                &trust_control::LocalReputationQuery { since, until },
+            )?
     } else {
         let receipt_db_path = require_receipt_db_path(receipt_db_path)?;
         let issuance_policy = policy_path
@@ -202,6 +206,7 @@ pub struct ReputationCompareCommand<'a> {
     /// Optional authority seed file used to derive the trusted kernel
     /// public key. See `ReputationLocalCommand::authority_seed_file`.
     pub authority_seed_file: Option<&'a Path>,
+    pub allowances: &'a EgressAllowanceSet,
 }
 
 #[allow(
@@ -223,6 +228,7 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
         control_url,
         control_token,
         authority_seed_file,
+        allowances,
     } = command;
 
     let passport: AgentPassport = crate::signed_input::read(passport_path)?;
@@ -237,15 +243,16 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
             ));
         }
         let token = super::require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?.reputation_compare(
-            subject_public_key,
-            &trust_control::ReputationCompareRequest {
-                passport: passport.clone(),
-                verifier_policy: verifier_policy.clone(),
-                since,
-                until,
-            },
-        )?
+        trust_control::service_runtime::client::build_client(url, token, allowances)?
+            .reputation_compare(
+                subject_public_key,
+                &trust_control::ReputationCompareRequest {
+                    passport: passport.clone(),
+                    verifier_policy: verifier_policy.clone(),
+                    since,
+                    until,
+                },
+            )?
     } else {
         let local = {
             let receipt_db_path = require_receipt_db_path(receipt_db_path)?;

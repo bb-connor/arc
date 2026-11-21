@@ -260,6 +260,7 @@ pub fn configure_receipt_store(
     receipt_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<(), CliError> {
     match (receipt_db_path, control_url) {
         (Some(_), Some(_)) => {
@@ -300,7 +301,7 @@ pub fn configure_receipt_store(
             let token = require_control_token(control_token)?;
             kernel.set_receipt_store(
                 trust_control::service_runtime::remote_stores::build_remote_receipt_store(
-                    url, token,
+                    url, token, allowances,
                 )?,
             )?;
         }
@@ -315,6 +316,7 @@ pub fn configure_revocation_store(
     revocation_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<(), CliError> {
     match (revocation_db_path, control_url) {
         (Some(_), Some(_)) => {
@@ -335,7 +337,7 @@ pub fn configure_revocation_store(
             let token = require_control_token(control_token)?;
             kernel.set_revocation_store(
                 trust_control::service_runtime::remote_stores::build_remote_revocation_store(
-                    url, token,
+                    url, token, allowances,
                 )?,
             );
         }
@@ -355,6 +357,7 @@ pub fn configure_capability_authority(
     control_token: Option<&str>,
     issuance_policy: Option<policy::ReputationIssuancePolicy>,
     runtime_assurance_policy: Option<policy::RuntimeAssuranceIssuancePolicy>,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<(), CliError> {
     if control_url.is_some() && (authority_seed_path.is_some() || authority_db_path.is_some()) {
         return Err(CliError::cli_other_error(
@@ -371,6 +374,7 @@ pub fn configure_capability_authority(
         kernel.set_capability_authority(
             trust_control::service_runtime::remote_authority::build_remote_capability_authority_with_clock(
                 url, token, kernel.authority_clock(),
+                allowances,
             )?,
         );
         return Ok(());
@@ -438,6 +442,7 @@ pub fn configure_budget_store(
     budget_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<(), CliError> {
     match (budget_db_path, control_url) {
         (Some(_), Some(_)) => {
@@ -451,7 +456,9 @@ pub fn configure_budget_store(
         (None, Some(url)) => {
             let token = require_control_token(control_token)?;
             kernel.set_budget_store(
-                trust_control::service_runtime::budget::build_remote_budget_store(url, token)?,
+                trust_control::service_runtime::budget::build_remote_budget_store(
+                    url, token, allowances,
+                )?,
             );
         }
         (None, None) => {}
@@ -720,7 +727,8 @@ mod tests {
     fn web3_evidence_requires_local_receipt_store() {
         let mut kernel = make_kernel(true);
 
-        let error = configure_receipt_store(&mut kernel, None, None, None).unwrap_err();
+        let error = configure_receipt_store(&mut kernel, None, None, None, &Default::default())
+            .unwrap_err();
         assert!(matches!(
             error,
             CliError::Kernel(chio_kernel::KernelError::Web3EvidenceUnavailable(_))
@@ -740,7 +748,8 @@ mod tests {
             "file:receipts.db?cache=shared&mode=memory",
         ] {
             let mut kernel = make_kernel(false);
-            let error = configure_receipt_store(&mut kernel, Some(Path::new(path)), None, None)
+            let db = Some(Path::new(path));
+            let error = configure_receipt_store(&mut kernel, db, None, None, &Default::default())
                 .unwrap_err();
             assert!(
                 error.to_string().contains("in-memory receipt database"),
@@ -750,7 +759,7 @@ mod tests {
 
         let durable = unique_receipt_db_path("chio-control-plane-durable-receipts");
         let mut kernel = make_kernel(false);
-        configure_receipt_store(&mut kernel, Some(&durable), None, None)
+        configure_receipt_store(&mut kernel, Some(&durable), None, None, &Default::default())
             .expect("durable filesystem receipt path must be accepted");
         let _ = std::fs::remove_file(durable);
     }
@@ -814,7 +823,7 @@ mod tests {
         let path = unique_receipt_db_path("chio-control-plane-web3-evidence");
         let mut kernel = make_kernel(true);
 
-        configure_receipt_store(&mut kernel, Some(&path), None, None).unwrap();
+        configure_receipt_store(&mut kernel, Some(&path), None, None, &Default::default()).unwrap();
         kernel.validate_web3_evidence_prerequisites().unwrap();
 
         let _ = std::fs::remove_file(path);
@@ -824,13 +833,9 @@ mod tests {
     fn web3_evidence_rejects_remote_append_only_receipt_store() {
         let mut kernel = make_kernel(true);
 
-        let error = configure_receipt_store(
-            &mut kernel,
-            None,
-            Some("http://127.0.0.1:8080"),
-            Some("test-token"),
-        )
-        .unwrap_err();
+        let (url, token) = (Some("http://127.0.0.1:8080"), Some("test-token"));
+        let error = configure_receipt_store(&mut kernel, None, url, token, &Default::default())
+            .unwrap_err();
         assert!(matches!(
             error,
             CliError::Kernel(chio_kernel::KernelError::Web3EvidenceUnavailable(_))

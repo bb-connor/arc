@@ -36,6 +36,8 @@ use serde::{Deserialize, Serialize};
 pub mod credentials;
 #[cfg(unix)]
 mod lifecycle_lock;
+pub mod registry_file;
+pub mod regular_file;
 
 #[cfg(unix)]
 pub use lifecycle_lock::LifecycleLock;

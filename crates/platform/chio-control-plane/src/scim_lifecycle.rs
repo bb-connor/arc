@@ -4,6 +4,7 @@ use std::path::Path;
 
 use chio_core::session::{EnterpriseFederationMethod, EnterpriseIdentityContext};
 use chio_core::sha256_hex;
+use chio_secure_ipc::regular_file::RegularFileError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -171,8 +172,8 @@ impl ScimLifecycleRegistry {
                 registry.version = SCIM_LIFECYCLE_REGISTRY_VERSION.to_string();
                 Ok(registry)
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(CliError::Io(error)),
+            Err(RegularFileError::Missing) => Ok(Self::default()),
+            Err(error) => Err(error.into()),
         }
     }
 

@@ -1,6 +1,7 @@
 use super::load_policy;
 use chio_core::capability::{scope::ChioScope, token::CapabilityToken};
 use chio_core::{Keypair, PublicKey};
+use chio_egress_contract::EgressAllowanceSet;
 use chio_kernel::{
     ChioKernel, KernelError, NestedFlowBridge, ToolCallRequest, ToolCallResponse,
     ToolServerConnection, Verdict,
@@ -68,12 +69,14 @@ impl Fixture {
             Some(&directory.path().join("receipts.sqlite3")),
             None,
             None,
+            &EgressAllowanceSet::default(),
         )?;
         crate::configure_revocation_store(
             &mut kernel,
             Some(&directory.path().join("revocations.sqlite3")),
             None,
             None,
+            &EgressAllowanceSet::default(),
         )?;
         let invocations = Arc::new(AtomicUsize::new(0));
         kernel.register_tool_server(Box::new(ReadServer(Arc::clone(&invocations))));

@@ -71,7 +71,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         issuance_policy: None,
         runtime_assurance_policy: None,
         advertise_url: None,
-        allow_local_peer_urls: true,
+        egress_allowances: Default::default(),
         certification_public_metadata_ttl_seconds: 300,
         cluster_sync_interval: Duration::from_millis(25),
         authority_replication_max_future_skew_seconds: 0,
@@ -226,6 +226,46 @@ async fn trust_control_metrics_rejects_unauthenticated_request() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
+async fn get_route(
+    path: &str,
+    token: Option<&str>,
+) -> Result<(StatusCode, Vec<u8>), Box<dyn std::error::Error>> {
+    use tower::ServiceExt;
+
+    let mut request = axum::http::Request::builder().method("GET").uri(path);
+    if let Some(token) = token {
+        request = request.header(AUTHORIZATION, format!("Bearer {token}"));
+    }
+    let response = super::build_router(metrics_state("service-secret"))
+        .oneshot(request.body(axum::body::Body::empty())?)
+        .await?;
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+    Ok((status, body.to_vec()))
+}
+
+/// The egress allowance digest is operator data: an anonymous read is refused
+/// exactly as an anonymous metrics scrape is, and a caller holding
+/// `metrics:read` reads the digest of the set this node dials under.
+#[tokio::test]
+async fn egress_allowance_digest_requires_an_operator_credential(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let anonymous = get_route(EGRESS_ALLOWANCES_PATH, None).await?;
+    assert_eq!(anonymous.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(anonymous, get_route("/metrics", None).await?);
+
+    let (status, body) = get_route(EGRESS_ALLOWANCES_PATH, Some("service-secret")).await?;
+    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
+    let body: serde_json::Value = serde_json::from_slice(&body)?;
+    assert_eq!(
+        body,
+        serde_json::json!({
+            "egressAllowanceDigest": chio_egress_contract::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
+        })
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn authority_key_log_sync_requires_service_auth_and_a_keyring() {
     let state = metrics_state("service-secret");
@@ -342,7 +382,11 @@ async fn standalone_holds_use_exact_versioned_rich_lifecycle(
         tokio::spawn(async move { axum::serve(listener, super::build_router(state)).await });
 
     let lifecycle = tokio::task::spawn_blocking(move || {
-        let store = build_remote_budget_store(&url, "service-secret")?;
+        let store = build_remote_budget_store(
+            &url,
+            "service-secret",
+            &chio_egress_contract::EgressAllowanceSet::default(),
+        )?;
         let authorize = |hold_id: &str| {
             store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
                 capability_id: "standalone-rich".to_string(),
@@ -632,7 +676,11 @@ async fn live_structured_denial_has_no_invented_usage_sequence_or_cache_mutation
         tokio::spawn(async move { axum::serve(listener, super::build_router(state)).await });
 
     tokio::task::spawn_blocking(move || {
-        let store = build_remote_budget_store(&url, "service-secret")?;
+        let store = build_remote_budget_store(
+            &url,
+            "service-secret",
+            &chio_egress_contract::EgressAllowanceSet::default(),
+        )?;
         let revocation_set =
             CanonicalRevocationSet::canonicalize(vec!["denied-composite".to_string()])?;
         let request = |hold_id: &str, operation_id: &str| BudgetAuthorizeHoldRequest {

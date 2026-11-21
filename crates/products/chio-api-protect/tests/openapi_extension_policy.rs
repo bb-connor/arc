@@ -67,6 +67,7 @@ async fn f069_invalid_extension_never_activates_issuance_or_proxy_listener() -> 
         approval: None,
         control_url: None,
         control_token: None,
+        control_egress_allowances: Default::default(),
         budget_db: None,
         revocation_db: None,
         allow_advisory: false,

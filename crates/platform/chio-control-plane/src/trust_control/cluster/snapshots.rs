@@ -367,7 +367,7 @@ pub(super) fn recover_cluster_snapshot(
         budget_origin_ack_heads,
     } = snapshot;
 
-    normalize_cluster_config_url(peer_url, true)?;
+    normalize_cluster_config_url(peer_url)?;
     let validated_revocation_cursor = validate_revocation_snapshot(&revocations, &replication)?;
 
     if let Some(store) = state

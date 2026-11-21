@@ -364,8 +364,11 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
         return Ok(());
     }
     super::authority_evidence::refresh_signing_custody(state);
-    let client =
-        service_runtime::client::build_cluster_peer_client(&state.config.access, peer_url)?;
+    let client = service_runtime::client::build_cluster_peer_client(
+        &state.config.access,
+        peer_url,
+        &state.config.egress_allowances,
+    )?;
     let peer_status = match client.cluster_status() {
         Ok(status) => status,
         Err(error) => {

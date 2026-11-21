@@ -1,4 +1,5 @@
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 use chio_mcp_adapter::edge::{McpToolInfo, McpToolResult, McpTransport};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -39,6 +40,7 @@ fn wrapped_child(text: &str) -> TestResult<(KernelMediatedMcpTransport, Arc<Atom
             result,
         }),
         &std::collections::BTreeSet::from(["http_request".into(), "echo".into()]),
+        &EgressAllowanceSet::default(),
     )?;
     Ok((transport, calls))
 }

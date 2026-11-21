@@ -147,11 +147,10 @@ pub(crate) fn build_cluster_state(
             .advertise_url
             .as_deref()
             .unwrap_or(&format!("http://{local_addr}")),
-        config.allow_local_peer_urls,
     )?;
     let mut peers = HashMap::new();
     for peer_url in &config.peer_urls() {
-        let peer_url = normalize_cluster_config_url(peer_url, config.allow_local_peer_urls)?;
+        let peer_url = normalize_cluster_config_url(peer_url)?;
         if peer_url != self_url {
             peers.insert(peer_url, PeerSyncState::default());
         }

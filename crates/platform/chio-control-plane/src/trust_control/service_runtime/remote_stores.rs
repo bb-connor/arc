@@ -19,9 +19,10 @@ const REMOTE_WRITER_QUEUE_DEPTH: usize = 2;
 pub fn build_remote_receipt_store(
     control_url: &str,
     control_token: &str,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<Box<dyn ReceiptStore>, CliError> {
     Ok(Box::new(RemoteReceiptStore {
-        client: build_client(control_url, control_token)?,
+        client: build_client(control_url, control_token, allowances)?,
         writer: BoundedWorkerPool::new(REMOTE_WRITER_WORKERS, REMOTE_WRITER_QUEUE_DEPTH),
     }))
 }
@@ -58,9 +59,10 @@ where
 pub fn build_remote_revocation_store(
     control_url: &str,
     control_token: &str,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<Box<dyn RevocationStore>, CliError> {
     Ok(Box::new(RemoteRevocationStore {
-        client: build_client(control_url, control_token)?,
+        client: build_client(control_url, control_token, allowances)?,
     }))
 }
 

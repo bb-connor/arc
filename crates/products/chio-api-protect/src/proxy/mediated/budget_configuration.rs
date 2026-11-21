@@ -62,6 +62,7 @@ pub(crate) fn build_budget_store(
             chio_control_plane::trust_control::service_runtime::budget::build_remote_budget_store(
                 control_url,
                 token,
+                &config.control_egress_allowances,
             )
             .map_err(|error| ProtectError::Config(error.to_string()))?;
         return Ok(Some(ConfiguredBudgetStore {

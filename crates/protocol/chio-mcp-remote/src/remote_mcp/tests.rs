@@ -291,6 +291,7 @@ fn test_remote_config() -> RemoteServeHttpConfig {
         wrapped_command: "/bin/true".to_string(),
         wrapped_args: vec!["mock.py".to_string()],
         egress_contract: None,
+        egress_allowances: Arc::new(chio_egress_contract::EgressAllowanceSet::default()),
     }
 }
 
@@ -1575,6 +1576,7 @@ fn provider_profile_can_derive_standard_oidc_discovery_url_from_issuer() {
         wrapped_command: "python3".to_string(),
         wrapped_args: vec!["mock.py".to_string()],
         egress_contract: None,
+        egress_allowances: Arc::new(chio_egress_contract::EgressAllowanceSet::default()),
     };
 
     let discovery_url = resolve_identity_provider_discovery_url(&config)
@@ -1754,6 +1756,7 @@ fn jwt_remote_auth_requires_separate_admin_token() {
         wrapped_command: "python3".to_string(),
         wrapped_args: vec!["mock.py".to_string()],
         egress_contract: None,
+        egress_allowances: Arc::new(chio_egress_contract::EgressAllowanceSet::default()),
     };
 
     let error = build_remote_auth_state(&config, "127.0.0.1:0".parse().unwrap(), None, None)

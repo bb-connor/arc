@@ -29,6 +29,24 @@
 
 #![forbid(unsafe_code)]
 
+/// Write a test fixture file and set its mode, independently of the test
+/// runner's umask, so owner and mode policies see exactly `mode`.
+pub fn write_file_with_mode(
+    path: &std::path::Path,
+    contents: impl AsRef<[u8]>,
+    mode: u32,
+) -> std::io::Result<()> {
+    std::fs::write(path, contents)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))?;
+    }
+    #[cfg(not(unix))]
+    let _ = mode;
+    Ok(())
+}
+
 /// Create a test-owned temporary directory suitable for private key custody.
 /// Set its mode at creation, independently of the test runner's umask.
 pub fn private_tempdir() -> std::io::Result<tempfile::TempDir> {

@@ -104,7 +104,9 @@ pub struct TrustServiceConfig {
     pub issuance_policy: Option<crate::policy::ReputationIssuancePolicy>,
     pub runtime_assurance_policy: Option<crate::policy::RuntimeAssuranceIssuancePolicy>,
     pub advertise_url: Option<String>,
-    pub allow_local_peer_urls: bool,
+    /// Operator-declared private network allowances for this node's
+    /// cluster peer and control clients.
+    pub egress_allowances: Arc<chio_egress_contract::EgressAllowanceSet>,
     pub certification_public_metadata_ttl_seconds: u64,
     pub cluster_sync_interval: Duration,
     /// Explicit future-issue skew for signed authority replication (0 to 60
@@ -368,7 +370,7 @@ mod service_config_tests {
             issuance_policy: None,
             runtime_assurance_policy: None,
             advertise_url: None,
-            allow_local_peer_urls: true,
+            egress_allowances: Default::default(),
             certification_public_metadata_ttl_seconds: PUBLIC_DISCOVERY_TTL_SECS,
             cluster_sync_interval: Duration::from_millis(25),
             authority_replication_max_future_skew_seconds: 0,
